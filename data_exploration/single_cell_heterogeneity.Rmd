@@ -1,0 +1,232 @@
+---
+title: "Single_cell_challenge"
+author: "Attila Gabor"
+date: "4/10/2019"
+output: html_document
+---
+
+# Stop 
+we cannot run single cell analysis because cell-id is missing. 
+
+# import data
+```{r}
+library(tidyverse)
+library(Rtsne)
+```
+
+First we just look for 3 cell-lines used in this report
+```{r}
+# we open and check which files contains info anbout the 3 selected cell-lines. 
+sc_files = list.files("./data/single_cell_raw/dream_rds_v2/",pattern = "_[0-9]+.rds",full.names = T)
+selected_files <- lapply(sc_files,function(fileName){
+	df = readRDS(fileName)
+	data.frame(file=fileName, df[1,1:3])
+})
+
+conditionTable = do.call("rbind",selected_files)
+if(FALSE)saveRDS(conditionTable,file = "./data/single_cell_raw/dream_rds_v2_conditionTable.rds")
+
+conditionTable <- readRDS( "./data/single_cell_raw/dream_rds_v2_conditionTable.rds")
+```
+
+# Import data from EGF, initial time 
+
+```{r}
+reporters = c('IdU', 'p-CREB', 'p-STAT5', 'p-SRC', 'p-FAK', 'p-MEK', 'p-MAPKAPK2',
+			  'p-S6K', 'p-MAP2K3', 'p-STAT1', 'p-p53', 'p-NFkB', 'p-p38', 'p-AMPK',
+			  'p-Akt(Ser473)', 'p-ERK', 'CyclinB', 'p-GSK3b', 'GAPDH', 'p-MKK3-MKK6',
+			  'p-PDPK1', 'p-BTK', 'p-p90RSK', 'p-SMAD23', 'p-STAT3', 'p-JNK',
+			  'Ki-67', 'p-H3', 'p-S6', 'cleavedCas', 'p-MKK4', 'p-AKT(Thr308)',
+			  'p-RB', 'p-4EBP1')
+```
+
+```{r}
+# select files 
+sc_data <- conditionTable %>%
+	filter(time %in% c(0,9), treatment %in% c("EGF","iEGFR")) %>% 
+	mutate(duplCond = duplicated(select(.data = ., time,treatment,cell_line))) %>%
+	filter(!duplCond) %>%
+	#slice(1:3)%>%
+	rowwise() %>% 
+	do( {
+		df = read_rds(path = as.character(.$file[[1]]))
+		filter(df,channel %in% reporters)
+	})
+```
+
+
+reshape to wide: each row a cell in a condition
+```{r}
+sc_data_per_cell <- sc_data %>% spread(channel,value)
+```
+
+we need to down-sample to do a t-SNE for all cell-lines
+
+```{r}
+sc_data_per_cell_sample <- sc_data_per_cell %>%
+	filter(cell_line !="CAMA1") %>%
+	filter(cell_line %in% unique(cell_line)[1:5]) %>%
+	group_by(cell_line,time,treatment) %>% do(sample_n(.,1000))
+```
+
+
+
+We use t-SNE to zoom into differences: 
+zoom0 : show the difference between cell-lines
+
+```{r}
+zoom0_tsne <- sc_data_per_cell_sample %>% select(one_of(reporters)) %>% Rtsne(.,verbose = T)
+```
+```{r}
+gg = sc_data_per_cell_sample %>%	bind_cols(data.frame(tsne_x=zoom0_tsne$Y[,1],
+													  tsne_y=zoom0_tsne$Y[,2])) %>%
+	ggplot(data=.,aes(tsne_x,tsne_y,col=cell_line)) +
+	geom_point(size=.4,alpha=0.5) + 
+	#	facet_wrap(~cell_line) +
+	theme_bw() + ggtitle("cell-line differences")
+ggsave(plot=gg,filename = "./figures/tsne_cell_line_differences.pdf",width = 7,height = 4)
+```
+
+```{r}
+gg <- sc_data_per_cell_sample %>%	bind_cols(data.frame(tsne_x=zoom0_tsne$Y[,1],
+													   tsne_y=zoom0_tsne$Y[,2])) %>%
+	filter(cell_line == "HCC1428") %>%
+	mutate(condition=paste(treatment,time,sep = "_"))%>%
+	ggplot(data=.,aes(tsne_x,tsne_y,col=condition)) +
+	geom_point(size=0.8,alpha=0.6) + 
+	#	facet_wrap(~cell_line) +
+	theme_bw() + ggtitle("HCC1428 cell-line in different conditions")
+ggsave(plot=gg,filename = "./figures/tsne_HCC1428_conditions.pdf",width = 7,height = 4)
+```
+
+```{r}
+ascombe = function(x){
+	2* sqrt(x+3/8) 
+}
+gg <- sc_data_per_cell_sample %>%	bind_cols(data.frame(tsne_x=zoom0_tsne$Y[,1],
+													   tsne_y=zoom0_tsne$Y[,2])) %>%
+	ggplot(data=.,aes(tsne_x,tsne_y,col=IdU)) +
+	geom_point(size=.4,alpha=0.5) + 
+	#	facet_wrap(~cell_line) +
+	theme_bw() + ggtitle("cell-cycle differences",subtitle = "colored by S-phase marker (IdU)")
+ggsave(plot=gg,filename = "./figures/tsne_Sphase_IdU.pdf",width = 7,height = 4)
+```
+```{r}
+sc_data_per_cell_sample %>%	bind_cols(data.frame(tsne_x=zoom0_tsne$Y[,1],
+												 tsne_y=zoom0_tsne$Y[,2])) %>%
+	ggplot(data=.,aes(tsne_x,tsne_y,col=`p-RB`)) +
+	geom_point(size=.4,alpha=0.5) + 
+	#	facet_wrap(~cell_line) +
+	theme_bw() + ggtitle("cell-cycle differences",subtitle = "colored by marker RB")
+```
+
+
+## WARNING: 
+this analysis is very unstable, depending which cells were sampled from all
+the cells we got different t-SNE results. Once we got 2 main islands of BT474
+but then we only got 2 for another sample. 
+
+It is yet unclear how to solve this problem: 
+- maybe check each cell-line one by one
+- or use PCA? 
+
+## Checking HCC202 or BT474
+```{r}
+gg <- sc_data_per_cell_sample %>%	bind_cols(data.frame(tsne_x=zoom0_tsne$Y[,1],
+													   tsne_y=zoom0_tsne$Y[,2])) %>%
+	filter(cell_line == "HCC202") %>%
+	mutate(condition=paste(treatment,time,sep = "_"))%>%
+	ggplot(data=.,aes(tsne_x,tsne_y,col=condition)) +
+	geom_point(size=0.8,alpha=0.6) + 
+	#	facet_wrap(~cell_line) +
+	theme_bw() + ggtitle("HCC202 cell-line in different conditions")
+ggsave(plot=gg,filename = "./figures/tsne_HCC202_conditions.pdf",width = 7,height = 4)
+```
+```{r}
+kmres <- sc_data_per_cell_sample %>%	bind_cols(data.frame(tsne_x=zoom0_tsne$Y[,1],
+														  tsne_y=zoom0_tsne$Y[,2])) %>%
+	filter(cell_line == "HCC202") %>%
+	mutate(condition=paste(treatment,time,sep = "_")) %>%
+	ungroup() %>%
+	select(starts_with("tsne")) %>%
+	kmeans(centers = 3,nstart = 300, iter.max = 1e6, algorithm = "Hartigan-Wong")
+
+
+sc_data_per_cell_sample %>%	bind_cols(data.frame(tsne_x=zoom0_tsne$Y[,1],
+												 tsne_y=zoom0_tsne$Y[,2])) %>%
+	filter(cell_line == "HCC202") %>%
+	mutate(condition=paste(treatment,time,sep = "_")) %>%
+	bind_cols(clust = kmres$cluster) %>%
+	ggplot(data=.,aes(tsne_x,tsne_y,col=as.factor(clust))) +
+	geom_point(size=0.8,alpha=0.6) + 
+	#	facet_wrap(~cell_line) +
+	theme_bw() + ggtitle("HCC202 cell-line in different conditions")
+
+
+```
+
+
+```{r,fig.width=10,fig.height=}
+sc_data_per_cell_sample %>%	bind_cols(data.frame(tsne_x=zoom0_tsne$Y[,1],
+												 tsne_y=zoom0_tsne$Y[,2])) %>%
+	filter(cell_line == "BT474") %>%
+	mutate(condition=paste(treatment,time,sep = "_")) %>%
+	bind_cols(clust = kmres$cluster) %>%
+	ungroup()%>%
+	gather(key="reporter",value="value",reporters) %>%
+	ggplot(aes(reporter,value,col=as.factor(clust))) + geom_violin() +theme(axis.text.x=element_text("")) + facet_wrap(~reporter,scales = "free")
+```
+
+# Level 2 : in-cell line heterogeneity
+Let's focus on a cell-line and find subpopulations in it
+
+
+```{r}
+selected_cell_line = "HCC202"
+set.seed(12334)
+cell_line_sample <-  sc_data_per_cell %>%
+	filter(cell_line !="CAMA1") %>%
+	filter(cell_line %in% c(selected_cell_line)) %>%
+	group_by(cell_line,time,treatment) %>% do(sample_n(.,2500)) %>% ungroup()
+```
+
+```{r}
+set.seed(12334)
+zoom1_tsne <- cell_line_sample %>% select(one_of(reporters)) %>% Rtsne(.,verbose = T)
+```
+```{r}
+
+gg1 = cell_line_sample %>%	bind_cols(data.frame(tsne_x=zoom1_tsne$Y[,1],
+												tsne_y=zoom1_tsne$Y[,2])) %>%
+	ggplot(data=.,aes(tsne_x,tsne_y,col=IdU)) +
+	geom_point(size=.4,alpha=0.5) + 
+	#	facet_wrap(~cell_line) +
+	theme_bw() + ggtitle(paste0(selected_cell_line, " heterogeneity"))
+gg2 = cell_line_sample %>%	bind_cols(data.frame(tsne_x=zoom1_tsne$Y[,1],
+												tsne_y=zoom1_tsne$Y[,2])) %>%
+	ggplot(data=.,aes(tsne_x,tsne_y,col=`p-RB`)) +
+	geom_point(size=.4,alpha=0.5) + 
+	#	facet_wrap(~cell_line) +
+	theme_bw() + ggtitle(paste0(selected_cell_line, " heterogeneity"))
+
+gridExtra::grid.arrange(gg1,gg2)
+```
+```{r}
+zoom1_pca <- cell_line_sample %>% select(one_of(reporters)) %>% prcomp(.)
+biplot(zoom1_pca)
+cell_line_sample %>%	bind_cols(data.frame(pc_x=zoom1_pca$x[,1],
+										  pc_y=zoom1_pca$x[,2])) %>%
+	ggplot(data=.,aes(pc_x,pc_y,col=`IdU`)) +
+	geom_point(size=.4,alpha=0.5) + 
+	#	facet_wrap(~cell_line) +
+	theme_bw() + ggtitle(paste0(selected_cell_line, " heterogeneity"))
+
+cell_line_sample %>%	bind_cols(data.frame(pc_x=zoom1_pca$x[,1],
+										  pc_y=zoom1_pca$x[,3])) %>%
+	ggplot(data=.,aes(pc_x,pc_y,col=`p-ERK`)) +
+	geom_point(size=.4,alpha=0.5) + 
+	#	facet_wrap(~cell_line) +
+	theme_bw() + ggtitle(paste0(selected_cell_line, " heterogeneity"))
+
+```
+

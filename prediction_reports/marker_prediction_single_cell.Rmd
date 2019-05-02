@@ -1,0 +1,271 @@
+---
+title: "marker_predictioin_single_cell"
+author: "Attila Gabor"
+date: "4/26/2019"
+output: html_document
+---
+
+
+Here we build random forest model to predict the single cell p-ERK response to combination of 
+stimulus and inhibitors. Predictions are based on other markers. 
+The model is trained from cell-lines which contains all the markerks in many exper
+
+
+
+```{r}
+reporters = c('IdU', 'p-CREB', 'p-STAT5', 'p-SRC', 'p-FAK', 'p-MEK', 'p-MAPKAPK2',
+			  'p-S6K', 'p-MAP2K3', 'p-STAT1', 'p-p53', 'p-NFkB', 'p-p38', 'p-AMPK',
+			  'p-Akt(Ser473)', 'p-ERK', 'CyclinB', 'p-GSK3b', 'GAPDH', 'p-MKK3-MKK6',
+			  'p-PDPK1', 'p-BTK', 'p-p90RSK', 'p-SMAD23', 'p-STAT3', 'p-JNK',
+			  'Ki-67', 'p-H3', 'p-S6', 'cleavedCas', 'p-MKK4', 'p-AKT(Thr308)',
+			  'p-RB', 'p-4EBP1')
+
+conditionTable <- readRDS( "./data/single_cell_raw/dream_rds_v2_conditionTable.rds")
+
+sc_data <- conditionTable %>%
+	filter(cell_line %in% c("AU565","HCC1428"))%>%
+	filter(time %in% c(0,5.5,9,17,30,60), !treatment %in% c("full")) %>% 
+	mutate(duplCond = duplicated(select(.data = ., time,treatment,cell_line))) %>%
+	filter(!duplCond) %>%
+	#slice(1:3)%>%
+	rowwise() %>% 
+	do( {
+		df = read_rds(path = as.character(.$file[[1]]))
+		filter(df,channel %in% reporters)
+	})
+sc_data_per_cell <- sc_data %>% 
+	#mutate(channel = make.names(as.character(channel))) %>%
+	spread(channel,value)
+
+sc_data_per_cell_sample <- sc_data_per_cell %>%
+	# filter(cell_line !="CAMA1") %>%
+	#filter(cell_line %in% unique(cell_line)[1:5]) %>%
+	group_by(cell_line,time,treatment) %>% do(sample_n(.,1000)) %>% ungroup()
+
+sc_data_per_cell_sample
+```
+
+
+
+
+## 1. Phospho-ERK prediction on single cell level
+
+
+```{r}
+cell_lines = as.character(unique(sc_data_per_cell_sample$cell_line))
+
+set.seed(123)
+validation_cell_lines = unique(c("AU565"))
+trainig_cell_lines = cell_lines[! cell_lines %in% validation_cell_lines]
+
+
+reporters <-  colnames(sc_data_per_cell_sample)[5:38]
+colnames(sc_data_per_cell_sample)[5:38] <- make.names(reporters)
+
+# training data: <free to use>
+# all reporters from training cell lines
+pERK_training_data = sc_data_per_cell_sample %>% 
+	filter(cell_line %in% trainig_cell_lines)
+
+# validation data: <KEEP>
+# all reporters from validation cell lines
+pERK_validation_data = sc_data_per_cell_sample %>% 
+	filter(cell_line %in% validation_cell_lines)
+
+# training data: <use for predict validation data>
+# all reporters, but p-ERK from validation cell lines
+pERK_test_data = sc_data_per_cell_sample %>% 
+	filter(cell_line %in% validation_cell_lines) %>%
+	select(-p.ERK)
+```
+
+## 1.1 RF simple psites
+First we use only the p-Sites (apart from p-ERK). 
+We dont use explicitly the time or treatment in this model. 
+
+```{r}
+library(ranger)
+
+# we start from pERK_training_data
+
+reporters <-  colnames(pERK_training_data)[5:38]
+
+# predictors = c("treatment","time", reporters[reporters!="p.ERK"])
+predictors = c(reporters[!reporters %in% c("p.ERK")])
+response = "p.ERK"
+
+rangerres0=ranger(as.formula(paste(response, " ~ ", paste(predictors, collapse= "+"))),
+				  data = pERK_training_data, 
+				  num.trees=1000,
+				  importance = "impurity",
+				  verbose=T,
+				  num.threads = 3)
+
+sort(rangerres0$variable.importance,decreasing = T)
+```
+
+
+This  shows that p-ERK is mainly determined by its downstream nodes
+
+
+```{r, fig.height=7, fig.width=10}
+pred.p.ERK_RF1 <- predict(rangerres0, data = pERK_validation_data)
+pred.p.ERK_RF1 <- predict(rangerres0, data = pERK_test_data)
+
+pERK_validation_data %>% 
+	select(cell_line,treatment,time,p.ERK) %>%
+	bind_cols(p.ERK.pred = pred.p.ERK_RF1$predictions) %>% 
+	gather(key = "source",value = "value",p.ERK,p.ERK.pred) %>%
+	ggplot() +
+	geom_violin(aes(x=time, y=value,fill=source)) +
+	facet_grid(treatment~cell_line) +
+	scale_color_manual(values = c("p.ERK" = "black", "p.ERK.pred" = "red")) + 
+	theme_bw() + 
+	ggtitle("p-ERK prediciton in validation data")
+```
+
+```{r, fig.width=9,fig.height=3}
+pERK_validation_data %>% 
+	select(cell_line,treatment,time,time_course,p.ERK) %>%
+	bind_cols(p.ERK.pred = pred.p.ERK_RF1$predictions) %>%
+	group_by(cell_line,treatment) %>%
+	summarise(RMSE = sqrt(sum((p.ERK - p.ERK.pred)^2)/n()),
+			  corr = cor(p.ERK, p.ERK.pred)) %>%
+	ggplot() +
+	geom_col(aes(x=treatment, y=RMSE,fill=treatment)) +
+	geom_hline(aes(yintercept = mean(RMSE))) + 
+	facet_grid(~cell_line)+ theme_bw()+ ylim(0,1) + 
+	theme(axis.text.x = element_text(angle = 90, hjust = 1)) 
+```
+
+
+Model performance: the baseline model captures well the time-course of p-ERK. Bigger discrepancy can be seen at the iMEK condition. The cell-lines where pERK actually depends on p-MEK have the highest error. (this is bc drug that inhibits MEK does not reduce p-MEK. TODO inform RF by the DRUG)  
+
+
+## 1.2 RF treatment information
+
+Let's train the RF model with info on MEK inhibiton. 
+The goal is that the RF can recognise that when we inhibit MEK, then p-MEK should 
+not be used as the predictor of p-ERK. 
+
+```{r}
+# we start from pERK_training_data
+RF2_data <- pERK_training_data %>% 
+	mutate(p.MEK = ifelse(treatment=="iMEK",0,p.MEK))
+
+reporters <-  colnames(RF2_data)[6:39]
+
+#predictors = c("iMEK",reporters[!reporters %in% c("p.ERK")])
+predictors = c(reporters[!reporters %in% c("p.ERK")])
+response = "p.ERK"
+#rangerres2=ranger(as.formula(paste(response, " ~ iMEK*p.MEK+ ", paste(predictors, collapse= "+"))),
+rangerres2=ranger(as.formula(paste(response, " ~ ", paste(predictors, collapse= "+"))),
+				  data = RF2_data, 
+				  num.trees=1000,
+				  importance = "impurity",
+				  verbose=T,
+				  num.threads = 3)
+
+data.frame(importance = sort(rangerres2$variable.importance,decreasing = T))
+```
+
+```{r, fig.height=7, fig.width=10}
+RF2_valid_data <- pERK_validation_data %>% mutate(p.MEK = ifelse(treatment=="iMEK",0,p.MEK))
+
+pred.p.ERK_RF2 <- predict(rangerres2, data = RF2_valid_data)
+
+RF2_valid_data %>% 
+	select(cell_line,treatment,time,time_course,p.ERK) %>%
+	bind_cols(p.ERK.pred = pred.p.ERK_RF2$predictions) %>%
+	ggplot() +
+	geom_point(aes(time,p.ERK,col="data")) + 
+	geom_point(aes(time,p.ERK.pred,col="pred"))  + 
+	geom_line(aes(time,p.ERK, col="data")) + 
+	geom_line(aes(time,p.ERK.pred,col="pred")) +
+	facet_grid(treatment~cell_line) +
+	scale_color_manual(values = c("data" = "black", "pred" = "red")) + 
+	theme_bw() + 
+	ggtitle("p-ERK prediciton in validation data")
+
+```
+
+```{r,fig.width=9,fig.height=3}
+RF2_valid_data %>% 
+	select(cell_line,treatment,time,time_course,p.ERK) %>%
+	bind_cols(p.ERK.pred = pred.p.ERK_RF2$predictions) %>%
+	group_by(cell_line,treatment) %>%
+	summarise(RMSE = sqrt(sum((p.ERK - p.ERK.pred)^2)/n()),
+			  corr = cor(p.ERK, p.ERK.pred)) %>%
+	ggplot() +
+	geom_col(aes(x=treatment, y=RMSE,fill=treatment)) +
+	geom_hline(aes(yintercept = mean(RMSE))) + 
+	facet_grid(~cell_line)+ theme_bw()+ ylim(0,1)+
+	theme(axis.text.x = element_text(angle = 90, hjust = 1)) 
+```
+
+
+
+## 1.3 RF treatment information, no downstream
+
+Remove the nodes from the features that are downstream of ERK
+
+
+```{r}
+# we start from pERK_training_data
+RF3_data <- pERK_training_data %>% 
+	mutate(p.MEK = ifelse(treatment=="iMEK",0,p.MEK))
+
+reporters <-  colnames(RF3_data)[6:39]
+
+#predictors = c("iMEK",reporters[!reporters %in% c("p.ERK")])
+predictors = c(reporters[!reporters %in% c("p.ERK", "p.p90RSK","p.MKK4","p.S6K","p.MAPKAPK2","p.p38")])
+response = "p.ERK"
+#rangerres2=ranger(as.formula(paste(response, " ~ iMEK*p.MEK+ ", paste(predictors, collapse= "+"))),
+rangerres3=ranger(as.formula(paste(response, " ~ ", paste(predictors, collapse= "+"))),
+				  data = RF3_data, 
+				  num.trees=1000,
+				  importance = "impurity",
+				  verbose=T,
+				  num.threads = 3)
+
+data.frame(importance = sort(rangerres3$variable.importance,decreasing = T))
+```
+
+```{r, fig.height=7, fig.width=10}
+RF3_valid_data <- pERK_validation_data %>% mutate(p.MEK = ifelse(treatment=="iMEK",0,p.MEK))
+
+pred.p.ERK_RF3 <- predict(rangerres3, data = RF3_valid_data)
+
+RF3_valid_data %>% 
+	select(cell_line,treatment,time,time_course,p.ERK) %>%
+	bind_cols(p.ERK.pred = pred.p.ERK_RF3$predictions) %>%
+	ggplot() +
+	geom_point(aes(time,p.ERK,col="data")) + 
+	geom_point(aes(time,p.ERK.pred,col="pred"))  + 
+	geom_line(aes(time,p.ERK, col="data")) + 
+	geom_line(aes(time,p.ERK.pred,col="pred")) +
+	facet_grid(treatment~cell_line) +
+	scale_color_manual(values = c("data" = "black", "pred" = "red")) + 
+	theme_bw() + 
+	ggtitle("p-ERK prediciton in validation data")
+
+```
+
+```{r,fig.width=9,fig.height=3}
+RF3_valid_data %>% 
+	select(cell_line,treatment,time,time_course,p.ERK) %>%
+	bind_cols(p.ERK.pred = pred.p.ERK_RF3$predictions) %>%
+	group_by(cell_line,treatment) %>%
+	summarise(RMSE = sqrt(sum((p.ERK - p.ERK.pred)^2)/n()),
+			  corr = cor(p.ERK, p.ERK.pred)) %>% 
+	ggplot() +
+	geom_col(aes(x=treatment, y=RMSE,fill=treatment)) +
+	geom_hline(aes(yintercept = mean(RMSE))) + 
+	facet_grid(~cell_line)+ theme_bw()+ ylim(0,1.2)+
+	theme(axis.text.x = element_text(angle = 90, hjust = 1)) + ggtitle(paste0("Prediction error"))
+```
+
+
+
+
+

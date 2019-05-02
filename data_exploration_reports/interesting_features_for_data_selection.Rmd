@@ -1,0 +1,576 @@
+---
+title: "DREAM Challenge: supporting figures for EGF perturbation data"
+author: "Attila Gabor and Marco Tognetti"
+date: "3/20/2019"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+
+## Overview : challenge 1.i
+
+What is the input:
+
+Challange 1.i is about predicting the time courses of some markers in some cell-lines based 
+on other markers of the cell line. 
+
+Cell-lines show various trends in response to stimuli and certain drug treatments. 
+We categorised these trends as non-responsive, peaking, rising, plateau and decreasing.
+
+In the following section we show some examples of these features from the data.
+
+The task will be to learn the dependency among the time course markers and 
+generate a model that can predict some missing markers. 
+
+
+
+
+## Input data shaping: 
+```{r, echo=FALSE}
+library(pheatmap)
+phospho_median <- readRDS("./data/raw_data/Median_allsamples_nocontrols_withcellcount.rds") %>% as_tibble()
+reporters = c('IdU', 'p-CREB', 'p-STAT5', 'p-SRC', 'p-FAK', 'p-MEK', 'p-MAPKAPK2',
+			  'p-S6K', 'p-MAP2K3', 'p-STAT1', 'p-p53', 'p-NFkB', 'p-p38', 'p-AMPK',
+			  'p-Akt(Ser473)', 'p-ERK', 'CyclinB', 'p-GSK3b', 'GAPDH', 'p-MKK3-MKK6',
+			  'p-PDPK1', 'p-BTK', 'p-p90RSK', 'p-SMAD23', 'p-STAT3', 'p-JNK',
+			  'Ki-67', 'p-H3', 'p-S6', 'cleavedCas', 'p-MKK4', 'p-AKT(Thr308)',
+			  'p-RB', 'p-4EBP1')
+phospho_median <-phospho_median %>% rename(cellcount=`dmt$cellcount`)
+phospho_median <-phospho_median %>% gather(key = "reporter",value="value",reporters) 
+phospho_median <- phospho_median %>% 	mutate(time=ifelse(is.na(time),0,as.numeric(as.character(time))))
+phospho_median
+
+```
+
+# Show Interesting features to support challenge questions
+
+### Response to EGF
+on absolute scale
+
+```{r, fig.height=10, fig.width=10,eval=FALSE}
+pdf("./figures/median_phospho_EGF_response.pdf")
+for(marker in unique(phospho_median$reporter)){
+	gg = phospho_median %>% 
+	filter(treatment=="EGF", reporter == marker) %>%
+	group_by(cell_line, time) %>% summarise(value=mean(value)) %>%
+	ggplot(aes(time,value)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + theme_bw() + guides(color=FALSE) + ggtitle(marker)
+	print(gg)
+}
+dev.off()
+```
+
+
+### p-CREB
+some cell-line show good activation/plateaue curves, others not reponding
+
+```{r}
+creb_responders = c("HCC1428", "HCC1569","HCC1599", "HCC2218","MDAMB468")
+creb_nonresponders = c("MDAkb2","MACLS2", "T47D")
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == "p-CREB") %>%
+	filter(cell_line %in% c(creb_responders,creb_nonresponders)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle("p-CREB",subtitle = "responding and non-responding cell-lines")
+```
+
+### p-STAT5
+non-responsive or plateau effects, high range
+
+```{r}
+pSite = "p-STAT5"
+responders = c("AU565", "HCC1806","HCC1187", "MCF12A","MDAMB468")
+nonresponders = c("BT20","BT483", "T47D")
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(responders,nonresponders)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "responding and non-responding cell-lines")
+```
+### p-SRC
+I dont see cell lines responding to EGF
+
+### p-FAK
+mostly non-responsive
+
+```{r}
+pSite = "p-FAK"
+responders = c("DU4475", "MCF12A","BT20")
+nonresponders = c("UACC893","KPL1", "HCC38")
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(responders,nonresponders)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "responding and non-responding cell-lines")
+```
+### p-MEK
+bit noisy, small changes, maybe because of large range. 
+```{r}
+pSite = "p-MEK"
+responders = c("AU565", "DU4475","HCC2157","MDAMB436")
+nonresponders = c("BT483","KPL1", "MX1","ZR7530")
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(responders,nonresponders)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "responding and non-responding cell-lines")
+```
+### p-MAPKAPK2
+various responses, not always clear. 
+```{r}
+pSite = "p-MAPKAPK2"
+responders = c("HCC1187", "AU565","MCF10A","HCC1428")
+nonresponders = c("MACLS2","KPL1", "ZR7530","MFM223")
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(responders,nonresponders)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "responding and non-responding cell-lines")
+```
+
+
+### p−S6K
+
+```{r}
+pSite = "p-S6K"
+responders = c("AU565", "DU4475","BT483","HCC1187")
+nonresponders = c("BT483","KPL1", "CAL120","MFM223","MPE600")
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(responders,nonresponders)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "responding and non-responding cell-lines")
+```
+
+### p−MAP2K3
+pretty noisy and the range of values are narrow
+
+
+### p−STAT1
+
+```{r}
+pSite = "p-STAT1"
+responders = c("AU565", "HCC1806", "BT20","MDAMB468")
+nonresponders = c("BT483", "T47D","HCC1187")
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(responders,nonresponders)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "responding and non-responding cell-lines")
+```
+## p−p53
+does not have much dynamics
+```{r}
+pSite = "p-p53"
+responders = c("184B5", "DU4475", "HCC1143","Hs578T")
+nonresponders = c("BT483", "T47D","HCC1187")
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(responders,nonresponders)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "responding and non-responding cell-lines")
+```
+
+### p−NFkB
+
+```{r}
+pSite = "p-NFkB"
+responders = c("184B5","AU565" ,"BT549", "CAL851","HCC1937","MCF12A","HCC1954")
+nonresponders = c("BT483", "T47D","EFM19")
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(responders,nonresponders)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "responding and non-responding cell-lines")
+```
+### p−p38
+we nice dynamics !!
+```{r}
+pSite = "p-p38"
+responders = c("184B5","AU565" ,"BT549", "CAL851","HCC1937","MCF12A","HCC1954","BT483", "T47D")
+nonresponders = c("EFM19")
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(responders,nonresponders)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "plateau and peaks")
+```
+### p−AMPK
+increasing and decreaseing dynamics
+```{r}
+pSite = "p-AMPK"
+increaseing = c("184A1","BT20",   "HCC1937", "HCC1937","HCC1937")
+decreasing = c("CAL851", "HDQP1","MCF10F","ZR751","HDQP1")
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(increaseing,decreasing)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "up and downs")
+```
+
+### p-AKT_S473
+nice signals as pointed out by Marco
+```{r}
+pSite = "p-Akt(Ser473)"
+plateau = c("AU565","HBL100",   "HCC1937", "HCC70","Hs578T")
+peaks = c("CAL851", "MCF12A","MDAkb2","UACC893","SKBR3")
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(plateau,peaks)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "up and downs")
+```
+### p-ERK
+nice signaling 
+```{r}
+pSite = "p-ERK"
+plateau = c("AU565",   "MDAMB436", "HCC1395","CAL51")
+peaks = c("HBL100", "MCF12A","MDAkb2","UACC893","SKBR3")
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(plateau,peaks)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "up and downs")
+```
+
+
+## CyclinB
+no much dynamics
+
+### GSK3b  
+
+```{r}
+pSite = "p-GSK3b"
+responders = c("184B5",   "CAL120", "AU565","MDAMB157","UACC893")
+nonresponders = c("HBL100", "HDQP1","MDAkb2","T47D")
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(responders,nonresponders)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "responders and non-responsive nodes")
+```
+
+### GAPDH  
+no strong response
+
+### p-MKK3-MKK6
+```{r}
+pSite = "p-MKK3-MKK6"
+responders = c("184A1", "HBL100",  "CAL120", "HCC2185","MDAMB157","HCC70")
+nonresponders = c("AU565", "HDQP1","MDAkb2","T47D")
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(responders,nonresponders)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "responders and non-responsive nodes")
+```
+### p-PDPK1
+effect is not really clear
+```{r}
+pSite = "p-PDPK1"
+responders = c("184B5", "MX1")
+nonresponders = c("HCC1806","T47D")
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(responders,nonresponders)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "responders and non-responsive nodes")
+```
+### p-BTK
+effect is not really clear
+```{r}
+pSite = "p-BTK"
+responders = c("HCC2185","DU4475", "HCC2185","MCF7","ZR7530","184A1")
+nonresponders = c("MDAkb2","T47D")
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(responders,nonresponders)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "responders and non-responsive nodes")
+```
+
+### p-p90RSK
+good signals
+```{r}
+pSite = "p-p90RSK"
+plateau = c("AU565",   "MDAMB436", "HCC1395","CAL51")
+peaks = c("HBL100", "MCF12A","MDAkb2","UACC893","SKBR3")
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(plateau,peaks)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "responders and non-responsive nodes")
+```
+### p-SMAD23
+effect is not really clear
+
+```{r}
+pSite = "p-SMAD23"
+samples = c("DU4475",   "CAL120", "HCC70","T47D")
+
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(samples)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "responders and non-responsive nodes")
+```
+
+
+### p-STAT3
+clearly most of the time no response, sometimes good peaks. 
+
+```{r}
+pSite = "p-STAT3"
+responders = c("184A1",   "184B5", "BT20","HCC1806","MDAMB468")
+nonresponders = c("HCC2218","MPE600")
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(responders,nonresponders)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "responders and non-responsive nodes")
+```
+
+
+### p-JNK
+effect is not really clear
+
+```{r}
+pSite = "p-JNK"
+responders = c("184A1",   "184B5", "BT549","MCF10A","SKBR3")
+nonresponders = c("HCC1806","MDAMB453")
+
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(responders,nonresponders)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "responders and non-responsive nodes")
+```
+### Ki-67
+not much dynamics
+
+
+### p-H3
+effect is not really clear
+
+```{r}
+pSite = "p-H3"
+
+responders = c("184A1",   "184B5", "HCC1937","MCF10A","SKBR3","UACC893")
+nonresponders = c("BT549","T47D","DU4475")
+
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(responders,nonresponders)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "responders and non-responsive nodes")
+```
+### p-S6
+really nice signals
+
+```{r}
+pSite = "p-S6"
+
+responders = c("184A1",   "HCC1187", "MCF12A","MCF10A","SKBR3","UACC893")
+nonresponders = c("CAL51","EFM192A","MACLS2")
+
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(responders,nonresponders)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "responders and non-responsive nodes")
+```
+
+### cleavedCas
+not clear.
+
+### p-MKK4
+nice signals ! plateau and peaks 
+
+
+```{r}
+pSite = "p-MKK4"
+
+responders = c("AU565",   "HCC2218", "CAL120","HCC1187","T47D","MDAMB157")
+nonresponders = c("MCF7","HCC1500","HCC70")
+
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(responders,nonresponders)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "responders and non-responsive nodes")
+```
+
+
+### p−AKT(Thr308)
+many unclear but some are nice .
+
+
+```{r}
+pSite = "p-AKT(Thr308)"
+
+responders = c("MCF12A",   "HCC1143", "DU4475","Hs578T","T47D")
+nonresponders = c("MCF7","HCC1500","HCC70")
+
+phospho_median %>% 
+	filter(treatment=="EGF") %>%
+	filter(reporter == pSite) %>%
+	filter(cell_line %in% c(responders,nonresponders)) %>%
+	ggplot(aes(time,value,group=cell_line)) + 
+	geom_line() +
+	facet_wrap(~cell_line) + 
+	theme_bw() + 
+	guides(color=FALSE) +
+	geom_smooth(formula = "y~x", method = "loess") +
+	ggtitle(pSite,subtitle = "responders and non-responsive nodes")
+```
+
+### 4EBP1 and RB
+not much dynamics

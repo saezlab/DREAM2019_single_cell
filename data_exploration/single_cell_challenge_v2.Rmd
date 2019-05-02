@@ -1,0 +1,269 @@
+---
+title: "singel_cell_challenge_v2"
+author: "Attila Gabor"
+date: "4/11/2019"
+output: html_document
+---
+
+# import data
+```{r}
+library(tidyverse)
+```
+
+
+```{r}
+reporters = c('IdU', 'p-CREB', 'p-STAT5', 'p-SRC', 'p-FAK', 'p-MEK', 'p-MAPKAPK2',
+			  'p-S6K', 'p-MAP2K3', 'p-STAT1', 'p-p53', 'p-NFkB', 'p-p38', 'p-AMPK',
+			  'p-Akt(Ser473)', 'p-ERK', 
+			  'CyclinB', 
+			  'p-GSK3b', 'GAPDH', 'p-MKK3-MKK6',
+			  'p-PDPK1', 'p-BTK', 'p-p90RSK', 'p-SMAD23', 'p-STAT3', 'p-JNK',
+			  'Ki-67', 
+			  'p-H3',
+			  'p-S6', 'cleavedCas', 'p-MKK4', 'p-AKT(Thr308)',
+			  'p-RB',
+			  'p-4EBP1')
+```
+
+First we just look for 3 cell-lines used in this report
+```{r}
+library(flowCore)
+library(flowViz)
+# we open and check which files contains info anbout the 3 selected cell-lines. 
+fcs_files = list.files("./data/single_cell_raw/experiment_18314_illustration_39845_spill_applied_fcs_files/",
+					   pattern = "KPL1_A",
+					   full.names = T)
+
+file_names = fcs_files
+import_FCS_data <- function(file_names){
+	
+	
+	map_table <- read_delim("./data/single_cell_raw/prot_info_fcs.csv",delim = ";",col_names = F)	
+	col_id  =map_table$X1
+	names(col_id) = map_table$X2
+	
+	data_set = list()
+	for(iFile in seq_along(file_names)){
+		samp <- flowCore::read.FCS(file_names[[iFile]], transformation = FALSE)
+		sc_mat <- flowCore::exprs(samp)
+		sc_data <- sc_mat%>% as_tibble() %>% rename(!!col_id)
+		
+		cond = strsplit(basename(file_names[[iFile]]), "_")[[1]]
+		
+		data_set[[iFile]] = sc_data %>% mutate(cell_line  = cond[[3]],
+											   time_course = cond[[4]],
+											   time = cond[[5]],
+											   treatment = cond[[6]]) 
+	}
+	return(bind_rows(data_set))
+}
+
+
+sc_data <- import_FCS_data(fcs_files)
+
+```
+
+```{r}
+ascombe = function(x){
+	2* sqrt(x+3/8) 
+}
+
+sc_data %>% select(one_of(reporters)) %>%
+	
+	ggplot() + geom_point(aes(x=ascombe(`p-RB`), y=ascombe(`CyclinB`)),alpha=0.2)
+```
+
+
+```{r}
+library(Rtsne)
+
+tsne_res <- sc_data %>% 
+	select(time_course,time,treatment,one_of(reporters)) %>%
+	group_by(time_course,time,treatment) %>% nest() %>%
+	mutate(tsne_res  = map(data, function(df)Rtsne(df,dims=2, verbose=TRUE)))
+
+if(FALSE) saveRDS(tsne_res,"data/single_cell_raw/KPL1_tsne_results.rds")
+
+tsne_res_coords <- tsne_res %>%
+	transmute(time_course, time, treatment, data, y = map(tsne_res, pluck("Y"))) %>%
+	mutate(c = map2(data, y, cbind))%>%
+	unnest(c) %>% rename(tsne_x=`1`,tsne_y=`2`)
+```
+
+
+
+
+# show the tsne plots in time 
+
+```{r}
+tsne_res_coords %>% dplyr::filter(time==0, treatment=="egf")%>%
+	ggplot() + geom_point(aes(tsne_x,tsne_y))
+
+ggplots = tsne_res_coords %>% filter(treatment %in% c("iPI3K", "imTOR", "iEGFR", "iPKC",  "iMEK", "egf" )) %>%
+	filter(time %in% c(0,5.5,9, 13,15,23,40)) %>%
+	group_by(treatment,time) %>%
+	group_map(~tibble(plots=list(
+		
+		ggplot(data=.,aes(tsne_x,tsne_y)) +
+			geom_point() +
+			ggtitle(paste0("treatment: ",.y[[1]],"time: ",  .y[[2]])) )
+	))
+ggplots <- ggplots %>% ungroup()%>%
+	mutate(time = as.numeric(as.character(time))) %>%
+	arrange(treatment,time) %>%
+	filter(!time %in% c(23,5.5))
+```
+
+```{r,fig.width=10,fig.height=10}
+do.call("grid.arrange", c(ggplots$plots, ncol=4))
+```
+
+
+
+### Co-tsne EGF0/9 with iPI3K 0 9 
+
+```{r}
+egf_iPI3K_data <- sc_data %>% 
+	select(time_course,time,treatment,one_of(reporters)) %>%
+	filter(treatment %in% c("egf","iPI3K"), time %in% c("0","9")) 
+egf_iPI3K_data_tsne <- egf_iPI3K_data %>% select(one_of(reporters)) %>%
+	Rtsne(dims=2, verbose=TRUE)
+
+library(Rphenograph)
+egf_iPI3K_data_pheno <-  egf_iPI3K_data %>% select(one_of(reporters)) %>% Rphenograph(k = 100)
+
+```
+
+
+```{r}
+egf_iPI3K_data %>%	bind_cols(data.frame(tsne_x=egf_iPI3K_data_tsne$Y[,1],
+										tsne_y=egf_iPI3K_data_tsne$Y[,2],
+										clust = as.numeric(membership(egf_iPI3K_data_pheno[[2]])
+										))) %>%
+	ggplot(data=.,aes(tsne_x,tsne_y,col=as.factor(clust))) +
+	#geom_point() + 
+	geom_bin2d() +
+	guides(color=FALSE) +
+	facet_grid(treatment~time) +
+	scale_fill_viridis_c(option = "A",direction = -1) +theme_bw()
+```
+
+
+## Cell cycle effect: 
+```{r}
+egf_iPI3K_data %>%	bind_cols(data.frame(tsne_x=egf_iPI3K_data_tsne$Y[,1],
+										tsne_y=egf_iPI3K_data_tsne$Y[,2],
+										clust = as.numeric(membership(egf_iPI3K_data_pheno[[2]])
+										))) %>%
+	filter(time==0, treatment=="egf")%>%
+	ggplot(data=.,aes(tsne_x,tsne_y,col=ascombe(IdU))) +
+	geom_point() + 
+	scale_color_gradient (name="IdU") +
+	#facet_grid(treatment~time) +
+	#scale_fill_viridis_c(option = "A",direction = -1) +
+	theme_bw() + ggtitle("cell line: KPL1, basal condition")
+
+```
+
+
+```{r}
+gg=list()
+gg[[1]] <- egf_iPI3K_data %>%	bind_cols(data.frame(tsne_x=egf_iPI3K_data_tsne$Y[,1],
+										tsne_y=egf_iPI3K_data_tsne$Y[,2],
+										clust = as.numeric(membership(egf_iPI3K_data_pheno[[2]])
+										))) %>%
+	filter(time==0, treatment=="egf")%>%
+	ggplot(data=.,aes(tsne_x,tsne_y,col=as.factor(clust))) +
+	#geom_point() + 
+	geom_bin2d() +
+	guides(color=FALSE) +
+	facet_grid(treatment~time) +
+	scale_fill_viridis_c(option = "A",direction = -1) +theme_bw()
+
+gg[[2]] <- egf_iPI3K_data %>%	bind_cols(data.frame(tsne_x=egf_iPI3K_data_tsne$Y[,1],
+										tsne_y=egf_iPI3K_data_tsne$Y[,2],
+										clust = as.numeric(membership(egf_iPI3K_data_pheno[[2]])
+										))) %>%
+	filter(time==9, treatment=="egf")%>%
+	ggplot(data=.,aes(tsne_x,tsne_y,col=as.factor(clust))) +
+	#geom_point() + 
+	geom_bin2d() +
+	guides(color=FALSE) +
+	facet_grid(treatment~time) +
+	scale_fill_viridis_c(option = "A",direction = -1) +theme_bw()
+
+gg[[3]] <- egf_iPI3K_data %>%	bind_cols(data.frame(tsne_x=egf_iPI3K_data_tsne$Y[,1],
+										tsne_y=egf_iPI3K_data_tsne$Y[,2],
+										clust = as.numeric(membership(egf_iPI3K_data_pheno[[2]])
+										))) %>%
+	filter(time==0, treatment=="iPI3K")%>%
+	ggplot(data=.,aes(tsne_x,tsne_y,col=as.factor(clust))) +
+	#geom_point() + 
+	geom_bin2d() +
+	guides(color=FALSE) +
+	facet_grid(treatment~time) +
+	scale_fill_viridis_c(option = "A",direction = -1) +theme_bw()
+
+gg[[4]] <- egf_iPI3K_data %>%	bind_cols(data.frame(tsne_x=egf_iPI3K_data_tsne$Y[,1],
+										tsne_y=egf_iPI3K_data_tsne$Y[,2],
+										clust = as.numeric(membership(egf_iPI3K_data_pheno[[2]])
+										))) %>%
+	filter(time==9, treatment=="iPI3K")%>%
+	ggplot(data=.,aes(tsne_x,tsne_y,col=as.factor(clust))) +
+	#geom_point() + 
+	geom_bin2d() +
+	guides(color=FALSE) +
+	facet_grid(treatment~time) +
+	scale_fill_viridis_c(option = "A",direction = -1) +theme_bw()
+
+
+do.call("grid.arrange", c(gg, ncol=2))
+```
+
+
+```{r,fig.width=15,fig.height=15}
+plots = sc_data %>% select(one_of(reporters)) %>%
+	bind_cols(data.frame(tsne_x=tsne_res$Y[,1], tsne_y=tsne_res$Y[,2])) %>%
+	gather(reporter,value = "value",-tsne_x,-tsne_y) %>%
+	group_by(reporter) %>%
+	group_map(~tibble(plots=list(
+		ggplot(data=.,aes(tsne_x,tsne_y)) +
+			geom_point(aes(col=ascombe(value))) +
+			ggtitle(.y[[1]]) + guides(color=FALSE))
+	))
+
+
+library(gridExtra)
+pdf("./data/single_cell_raw/figures/JIMT1_A_0_egf_clusters.pdf",width = 14,height = 14)
+do.call("grid.arrange", c(plots$plots, ncol=5))
+dev.off()
+
+plots$plots[[2]]
+```
+```{r}
+
+
+egf_iPI3K_data_tsne_lowIdU <- egf_iPI3K_data %>%
+	select(one_of(reporters)) %>%
+	filter(ascombe(IdU)<50)%>%
+	Rtsne(dims=2, verbose=TRUE)
+
+
+egf_iPI3K_data_pheno_lowIdU <-  egf_iPI3K_data %>%
+	select(one_of(reporters)) %>%
+	filter(ascombe(IdU)<50)%>% Rphenograph(k = 500)
+
+```
+
+
+```{r}
+
+sc_data_long <- sc_data %>% select(one_of(reporters)) %>% mutate(cell_id = 1:nrow(.)) %>%
+	gather(key = reporter,value = "value",-cell_id)
+
+
+sc_data_long %>%
+	ggplot() + geom_violin(aes(reporter,ascombe(value)),scale = "width") + 
+	theme(axis.text.x=element_text(angle=90, hjust=1))
+
+```

@@ -1,0 +1,62 @@
+---
+title: "Exploring proteomics for DREAM"
+author: "Attila Gabor"
+date: "4/29/2019"
+output:
+  html_document: 
+    toc: yes
+  pdf_document: default
+---
+Checking the proteomics data for the DREAM challenge. 
+
+```{r,include=FALSE}
+library(tidyverse)
+library(ggplot2)
+```
+
+```{r}
+proteomics_raw <- readRDS("data/proteomics/MSstat_groupComparison_selceted.rds") %>% as_tibble()
+proteomics_raw
+```
+
+```{r}
+str(proteomics_raw)
+unique(proteomics_raw$Label)
+```
+
+Columns:
+- Protein: uniprotIDs divided by ";". 
+	- Why are multiple proteins in the same row?
+	- in total 9031 protein families measured -- how does it distribute across cell-lines?
+- Label: cell-line info
+
+
+How many proteins measured per cell-line?
+```{r}
+protein_cell_line_table <- table(proteomics_raw[,1:2])
+all(protein_cell_line_table==1) == TRUE
+```
+apparently all the proteins are measured across all cell-lines? -- appears in the table, maybe some values are NA/Inf.
+
+```{r}
+print(nrow(proteomics_raw))
+print(table(proteomics_raw$issue))
+```
+Print a heatmap to show missing elements:
+```{r,fig.width=10}
+measured_conds <- proteomics_raw[,1:2]
+measured_conds <- measured_conds[is.na(proteomics_raw$issue),]
+real_proteomics_data <- table(measured_conds)
+pheatmap::pheatmap(real_proteomics_data,cluster_cols = F,cluster_rows = F,labels_row = "")
+```
+Some proteins seems to be missing from the majority of the cell-lines:
+```{r}
+rowSums(real_proteomics_data) %>% enframe() %>% arrange(value) %>% mutate(name=factor(name,levels = .$name)) %>%
+	ggplot() + geom_point(aes(1:length(name),value)) + 
+	xlab("protein rank") + ylab("measured in cell-lines") +
+	ggtitle("Measured proteins without an issue",subtitle = "in how many cell-lines a protein was measured")
+```
+```{r}
+any(proteomics_raw$ImputationPercentage>0)
+```
+

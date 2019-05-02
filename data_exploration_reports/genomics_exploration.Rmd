@@ -1,0 +1,63 @@
+---
+title: "Exploring the genomics data for DREAM"
+author: "Attila Gabor"
+date: "4/30/2019"
+output: html_document
+---
+Checking the RNAseq data for the DREAM challenge. 
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+```
+
+Importing data and converting to numerical values, cell-lines variable moved to the first column.
+```{r}
+rnaseq_raw <- readRDS("data/genomics/dat_RNAseq_Marcotte.rds") %>% as_tibble()
+cell_lines <- rnaseq_raw$Cellline
+rnaseq_raw$Cellline <- NULL
+rnaseq_raw <- type_convert(rnaseq_raw, col_types = cols(.default = col_double()))
+rnaseq_raw <- bind_cols(data.frame(cell_lines=cell_lines), rnaseq_raw)
+rnaseq <- rnaseq_raw %>% gather("gene","value",-cell_lines) 
+```
+```{r}
+rnaseq %>% group_by(cell_lines) %>% summarise(mean=mean(value),sd=sd(value))
+```
+
+The mean is close to zero, but the SD is 3.5 is strange. 
+
+
+## Exploring cell-line-wise distribution
+Ricardo and Jan suggests to plot the distribution per cell-line. 
+Usually the overall distribution of the gene-counts should be similar. 
+
+
+```{r,fig.width=14}
+rnaseq %>% ggplot(aes(cell_lines,value)) +
+	geom_violin() + 
+	ggtitle("RNA distribution per cell-line") +
+	theme_bw() + theme(axis.text.x =  element_text(angle = 90, hjust = 1))
+```
+There are many zero readouts, which is OK. But the vaeriables maybe better to start at 0?
+
+
+
+
+### CNV
+```{r}
+cnv_raw <- readRDS("data/genomics/CNV_MARCOTTE.rds") %>% as_tibble()
+cnv_raw
+```
+
+```{r,fig.width=14}
+
+cnv <- cnv_raw %>% gather("cell_lines","value",-symbol) 
+cnv %>% ggplot(aes(cell_lines,value)) +
+	geom_violin(scale = "width") + 
+	ggtitle("CNV distribution per cell-line") +
+	theme_bw() + theme(axis.text.x =  element_text(angle = 90, hjust = 1))
+
+```
+```{r}
+cnv %>% group_by(cell_lines) %>% summarise(mean=mean(value),sd=sd(value))
+```
