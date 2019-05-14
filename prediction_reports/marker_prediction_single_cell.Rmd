@@ -1,271 +1,521 @@
 ---
-title: "marker_predictioin_single_cell"
+title: "Single cell marker prediction -- DREAM AIM I"
 author: "Attila Gabor"
 date: "4/26/2019"
 output: html_document
 ---
 
 
+```{r include=FALSE}
+library(tidyverse)
+library(DBI)
+library(RSQLite)
+library(progress)
+```
 Here we build random forest model to predict the single cell p-ERK response to combination of 
 stimulus and inhibitors. Predictions are based on other markers. 
 The model is trained from cell-lines which contains all the markerks in many exper
 
 
+```{r}
+con <- dbConnect(RSQLite::SQLite(), "./data/cleaned_single_cell_data/single_cell_dream_cls.sqlite")
+```
+
+Explore the database (tutorial-ish)
+
+Get available cell-lines. Each cell-lines are stored in a table. 
+```{r}
+tables <-  dbListTables(con)
+cols <- dbListFields(con,tables[[1]])
+timepoints <- dbGetQuery(con,paste0("SELECT DISTINCT time FROM  ",dbQuoteIdentifier(con,tables[[1]])))
+treatments <- dbGetQuery(con,paste0("SELECT DISTINCT treatment FROM  ",dbQuoteIdentifier(con,tables[[1]])))
+```
+
+
+## DREAM AIM 1 data preprocessing
+First we load the cell-lines for the training and for the test.
+We specify the features and response variables. 
+Remove the response variables from the test set.
 
 ```{r}
-reporters = c('IdU', 'p-CREB', 'p-STAT5', 'p-SRC', 'p-FAK', 'p-MEK', 'p-MAPKAPK2',
-			  'p-S6K', 'p-MAP2K3', 'p-STAT1', 'p-p53', 'p-NFkB', 'p-p38', 'p-AMPK',
-			  'p-Akt(Ser473)', 'p-ERK', 'CyclinB', 'p-GSK3b', 'GAPDH', 'p-MKK3-MKK6',
-			  'p-PDPK1', 'p-BTK', 'p-p90RSK', 'p-SMAD23', 'p-STAT3', 'p-JNK',
-			  'Ki-67', 'p-H3', 'p-S6', 'cleavedCas', 'p-MKK4', 'p-AKT(Thr308)',
-			  'p-RB', 'p-4EBP1')
+training_celllines = c('AU565','BT483','CAL148', 'SKBR3','HBL100', 'HCC2185','MCF10A')
+test_celllines = c('T47D','HCC1806','HCC2218', 'HCC70','UACC893')
 
-conditionTable <- readRDS( "./data/single_cell_raw/dream_rds_v2_conditionTable.rds")
+training_size_per_cond = 500
+test_size_per_cond = 500
 
-sc_data <- conditionTable %>%
-	filter(cell_line %in% c("AU565","HCC1428"))%>%
-	filter(time %in% c(0,5.5,9,17,30,60), !treatment %in% c("full")) %>% 
-	mutate(duplCond = duplicated(select(.data = ., time,treatment,cell_line))) %>%
-	filter(!duplCond) %>%
-	#slice(1:3)%>%
-	rowwise() %>% 
-	do( {
-		df = read_rds(path = as.character(.$file[[1]]))
-		filter(df,channel %in% reporters)
-	})
-sc_data_per_cell <- sc_data %>% 
-	#mutate(channel = make.names(as.character(channel))) %>%
-	spread(channel,value)
+bar = progress::progress_bar$new(format = "  Processing [:bar] :percent eta: :eta",
+								 total = length(training_celllines))
 
-sc_data_per_cell_sample <- sc_data_per_cell %>%
-	# filter(cell_line !="CAMA1") %>%
-	#filter(cell_line %in% unique(cell_line)[1:5]) %>%
-	group_by(cell_line,time,treatment) %>% do(sample_n(.,1000)) %>% ungroup()
+training_data = sapply(training_celllines, function(cl){
+	bar$tick()
+	
+	# load cell_line and limit the number of cells
+	tmp = dbReadTable(con,  dbQuoteIdentifier(con,cl)) %>% 
+		as_tibble() %>%
+		group_by(treatment,time) %>% 
+		filter(row_number()<training_size_per_cond)
+	
+	
+},simplify = F)
 
-sc_data_per_cell_sample
+training_data = do.call("rbind",training_data) %>% as_tibble()
+
+bar = progress::progress_bar$new(format = "  Processing [:bar] :percent eta: :eta",
+								 total = length(test_celllines))
+test_data = sapply(test_celllines, function(cl){
+	bar$tick()
+	
+	# load cell_line and limit the number of cells
+	tmp = dbReadTable(con,  dbQuoteIdentifier(con,cl)) %>% 
+		as_tibble() %>%
+		group_by(treatment,time) %>% 
+		filter(row_number()<test_size_per_cond)
+},simplify = F)	
+
+test_data = do.call("rbind",test_data) %>% as_tibble()
+
+
+aim1_data = training_data %>% mutate(data_type = "training") %>%
+	bind_rows(test_data %>% mutate(data_type = "test"))
+
 ```
 
 
 
-
-## 1. Phospho-ERK prediction on single cell level
-
-
 ```{r}
-cell_lines = as.character(unique(sc_data_per_cell_sample$cell_line))
+reporters <- colnames(training_data)[6:42]
+#reporters <- setdiff(colnames(training_data)[6:42],c("p.HER2", "p.PLCg2"))
+response = c("p.ERK", "p.Akt.Ser473.","p.S6","p.HER2", "p.PLCg2")
+stopifnot(all(response %in% reporters))
 
-set.seed(123)
-validation_cell_lines = unique(c("AU565"))
-trainig_cell_lines = cell_lines[! cell_lines %in% validation_cell_lines]
-
-
-reporters <-  colnames(sc_data_per_cell_sample)[5:38]
-colnames(sc_data_per_cell_sample)[5:38] <- make.names(reporters)
-
-# training data: <free to use>
-# all reporters from training cell lines
-pERK_training_data = sc_data_per_cell_sample %>% 
-	filter(cell_line %in% trainig_cell_lines)
-
-# validation data: <KEEP>
-# all reporters from validation cell lines
-pERK_validation_data = sc_data_per_cell_sample %>% 
-	filter(cell_line %in% validation_cell_lines)
-
-# training data: <use for predict validation data>
-# all reporters, but p-ERK from validation cell lines
-pERK_test_data = sc_data_per_cell_sample %>% 
-	filter(cell_line %in% validation_cell_lines) %>%
-	select(-p.ERK)
+predictors = setdiff(reporters, response)
 ```
+
+## 1. Phospho-prediction on single cell level
+
+Visualise the data outline as a table / heatmap
+```{r}
+pheat_data = aim1_data %>% 
+	group_by(cell_line, treatment,data_type) %>% summarise_at(reporters,~mean(.)) %>% 
+	ungroup() %>%
+	gather("reporter","value",-cell_line,-treatment,-data_type) %>%
+	mutate(condition = paste(reporter,treatment,sep = "_")) %>%
+	select(reporter,cell_line,condition,value) %>%
+	mutate(value = ifelse(reporter %in% response,-1,1)) %>%
+	mutate(value = ifelse(cell_line %in% training_celllines,2,value)) %>%
+	spread(cell_line,value,fill = NA) 
+
+row_names = pheat_data %>% group_by(reporter) %>% mutate(row_name = ifelse(row_number() == round(n()/2),reporter,"")) %>%
+	ungroup() %>%
+	pull(row_name)
+
+#column_to_rownames("row_name") %>%
+
+pheat_res = pheat_data %>%
+	select(-reporter,-condition) %>% 
+	select(training_celllines,test_celllines)%>%
+	pheatmap::pheatmap(mat = ., color = c("#E41A1C", "#377EB8", "#4DAF4A") ,
+					   cluster_rows = F,
+					   cluster_cols = F,
+					   #   border_color=NA,
+					   na_col = "grey", labels_row = row_names)
+ggsave("./figures/aim1_data.pdf",plot = pheat_res$gtable,width = 5,height = 7)
+
+```
+Visualise with the emphasiz on single cell:
+
+select a cell line from training and one from validation and show which data shall be imputed. 
+
+```{r,fig.width=6, fig.height=3}
+vis_data_1 <-  aim1_data %>%
+	filter(cell_line %in% c("AU565","HCC1806")) %>%
+	mutate(cell_line = ifelse(cell_line=="AU565","training","test")) %>%
+	filter(time == 7, treatment=="iMEK") %>% ungroup %>%
+	group_by(cell_line,time,treatment) %>% 
+	filter(fileID == min(fileID)) %>% ungroup %>%
+	filter(cellID < 100) %>%
+	gather("reporter","value",-cell_line,-treatment,-time,-cellID,-fileID,-data_type) %>%
+	filter(!  (data_type == "test" & reporter %in% response )) %>%
+	filter(reporter %in%  c("p.ERK","p.S6","p.MEK","p.MKK4","p.p90RSK","p.S6K")) %>%
+	mutate(fill_col = ifelse(reporter %in% c("p.ERK","p.S6"),"response","predictor")) %>%
+	filter(!is.na(value))
+
+gg_aim_1_scell_fig1 = vis_data_1  %>%	ggplot(data=., aes(factor(""),value)) +
+	geom_dotplot(fill=rgb(colorRamp(colors=RColorBrewer::brewer.pal(11,"Spectral"))(vis_data_1$cellID/max(vis_data_1$cellID)),maxColorValue = 256),
+				 binaxis='y',binwidth=0.1 , binpositions="all", stackdir='center',dotsize = 8,) + guides(fill="none")+
+	facet_grid(cell_line ~ reporter) + theme_bw() + xlab("condition")
+print(gg_aim_1_scell_fig1)
+ggsave(plot=gg_aim_1_scell_fig1,filename = "./figures/aim1_single_cell_details_dotplot_v1.pdf",height = 3,width = 6)
+```
+
+For AIM 1.2 we cannot identify cells, so we can plot each cell without a color. 
+we will compare distributions.
+
+
+```{r,fig.width=6, fig.height=3}
+vis_data_1  %>%	ggplot(data=., aes(factor(""),value)) +
+	geom_dotplot(fill="white",#fill=rgb(colorRamp(colors=RColorBrewer::brewer.pal(11,"Spectral"))(vis_data_1$cellID/max(vis_data_1$cellID)),maxColorValue = 256),
+				 #col=rgb(colorRamp(colors=RColorBrewer::brewer.pal(11,"Spectral"))(vis_data_1$cellID/max(vis_data_1$cellID)),maxColorValue = 256),
+				 binaxis='y',binwidth=0.1 , binpositions="all", stackdir='center',dotsize = 5,) + guides(fill="none")+
+	#geom_violin(aes(col=fill_col,fill=fill_col),alpha=.5,scale = "count",size=2) +
+	facet_grid(cell_line ~ reporter) + theme_bw() + xlab("condition")
+
+```
+
 
 ## 1.1 RF simple psites
 First we use only the p-Sites (apart from p-ERK). 
 We dont use explicitly the time or treatment in this model. 
 
+### option 1: 
+- predict p-ERK using all the samples, run all at once. 
 ```{r}
 library(ranger)
+# p-ERK
+rangerres_res1=ranger(as.formula(paste(response[1], " ~ ", paste(predictors, collapse= "+"))),
+					  data = aim1_data %>% filter(data_type =="training"), 
+					  num.trees=300,
+					  importance = "impurity",
+					  verbose=T,
+					  seed=12345,
+					  num.threads = 3)
+```
 
-# we start from pERK_training_data
+### option 2 (control): 
+- predict p-ERK using all the samples, shuffled. Training data is column-wise shuffled, which 
+destroys the correlation between markers and probably results in a useless model. 
+```{r}
+# p-ERK: shuffled training data
+rand_shuffle <- function(x){
+	sample(x,length(x))
+}
 
-reporters <-  colnames(pERK_training_data)[5:38]
+randomised_data = aim1_data %>% filter(data_type =="training") %>%
+	group_by(cell_line) %>% mutate_at(predictors,rand_shuffle) %>% ungroup()
 
-# predictors = c("treatment","time", reporters[reporters!="p.ERK"])
-predictors = c(reporters[!reporters %in% c("p.ERK")])
-response = "p.ERK"
 
-rangerres0=ranger(as.formula(paste(response, " ~ ", paste(predictors, collapse= "+"))),
-				  data = pERK_training_data, 
-				  num.trees=1000,
-				  importance = "impurity",
-				  verbose=T,
-				  num.threads = 3)
+# randomised_data %>% filter(time==7,treatment=="EGF", cell_line== "AU565") %>% ggplot() + geom_point(aes(p.ERK,p.p90RSK))
+# aim1_data %>% filter(data_type =="training") %>% filter(time==7,treatment=="EGF", cell_line== "AU565") %>% ggplot() + geom_point(aes(p.ERK,p.p90RSK))
 
-sort(rangerres0$variable.importance,decreasing = T)
+rangerres_res1_random=ranger(as.formula(paste(response[1], " ~ ", paste(predictors, collapse= "+"))),
+							 data = randomised_data, 
+							 num.trees=300,
+							 importance = "impurity",
+							 verbose=T,
+							 seed=12345,
+							 num.threads = 3)
+rangerres_res1_random$prediction.error
+rangerres_res1_random$r.squared
+```
+
+
+### option 3: 
+p-ERK, but let's build a model for each condition:
+```{r}
+bar = progress::progress_bar$new(format = "  Processing [:bar] :percent eta: :eta",
+								 total = nrow(unique(aim1_data %>% 
+								 						filter(data_type =="training") %>%
+								 						select("treatment","time"))
+								 			 ))
+
+fit_forest = function(tr_data){
+	bar$tick()
+	rf_model=ranger(as.formula(paste(response[1], " ~ ", paste(predictors, collapse= "+"))),
+					data = tr_data,
+					num.trees=300,
+					importance = "impurity",
+					verbose=T,
+					seed=12345,
+					num.threads = 3)
+}
+
+
+aim1_models_3 <- aim1_data %>% filter(data_type =="training") %>%
+	group_by(treatment,time) %>% nest() %>%
+	mutate(models = map(data,fit_forest))
+
+aim1_models_3_stats <-  aim1_models_3 %>% mutate(model_stats  = map(models,function(m){
+	as.data.frame(m[c("r.squared","prediction.error")])
+} )) %>% unnest(model_stats) %>%
+	mutate(std_y = map(data,function(d) std_y = sd(d$`p.ERK`))) %>%
+	unnest(std_y) %>% select(treatment,time,r.squared, prediction.error,std_y)
+
+aim1_models_3_stats %>% ggplot(aes(sqrt(1-r.squared)*std_y,prediction.error)) + geom_point()
+aim1_models_3_stats %>% ggplot(aes(r.squared,prediction.error)) + geom_point()
+```
+
+
+
+```{r}
+
+# p.Akt.Ser473.
+rangerres_res2=ranger(as.formula(paste(response[2], " ~ ", paste(predictors, collapse= "+"))),
+					  data = training_data, 
+					  num.trees=300,
+					  importance = "impurity",
+					  verbose=T,
+					  seed=12345,
+					  num.threads = 3)
+
+# p.S6
+rangerres_res3=ranger(as.formula(paste(response[3], " ~ ", paste(predictors, collapse= "+"))),
+					  data = training_data, 
+					  num.trees=300,
+					  importance = "impurity",
+					  verbose=T,
+					  seed=12345,
+					  num.threads = 3)
+
+
+
 ```
 
 
 This  shows that p-ERK is mainly determined by its downstream nodes
 
 
-```{r, fig.height=7, fig.width=10}
-pred.p.ERK_RF1 <- predict(rangerres0, data = pERK_validation_data)
-pred.p.ERK_RF1 <- predict(rangerres0, data = pERK_test_data)
-
-pERK_validation_data %>% 
-	select(cell_line,treatment,time,p.ERK) %>%
-	bind_cols(p.ERK.pred = pred.p.ERK_RF1$predictions) %>% 
-	gather(key = "source",value = "value",p.ERK,p.ERK.pred) %>%
-	ggplot() +
-	geom_violin(aes(x=time, y=value,fill=source)) +
-	facet_grid(treatment~cell_line) +
-	scale_color_manual(values = c("p.ERK" = "black", "p.ERK.pred" = "red")) + 
-	theme_bw() + 
-	ggtitle("p-ERK prediciton in validation data")
-```
-
-```{r, fig.width=9,fig.height=3}
-pERK_validation_data %>% 
-	select(cell_line,treatment,time,time_course,p.ERK) %>%
-	bind_cols(p.ERK.pred = pred.p.ERK_RF1$predictions) %>%
-	group_by(cell_line,treatment) %>%
-	summarise(RMSE = sqrt(sum((p.ERK - p.ERK.pred)^2)/n()),
-			  corr = cor(p.ERK, p.ERK.pred)) %>%
-	ggplot() +
-	geom_col(aes(x=treatment, y=RMSE,fill=treatment)) +
-	geom_hline(aes(yintercept = mean(RMSE))) + 
-	facet_grid(~cell_line)+ theme_bw()+ ylim(0,1) + 
-	theme(axis.text.x = element_text(angle = 90, hjust = 1)) 
-```
-
-
-Model performance: the baseline model captures well the time-course of p-ERK. Bigger discrepancy can be seen at the iMEK condition. The cell-lines where pERK actually depends on p-MEK have the highest error. (this is bc drug that inhibits MEK does not reduce p-MEK. TODO inform RF by the DRUG)  
-
-
-## 1.2 RF treatment information
-
-Let's train the RF model with info on MEK inhibiton. 
-The goal is that the RF can recognise that when we inhibit MEK, then p-MEK should 
-not be used as the predictor of p-ERK. 
-
 ```{r}
-# we start from pERK_training_data
-RF2_data <- pERK_training_data %>% 
-	mutate(p.MEK = ifelse(treatment=="iMEK",0,p.MEK))
 
-reporters <-  colnames(RF2_data)[6:39]
+pred_res1 <- predict(rangerres_res1, data = aim1_data %>% filter(data_type =="test") )
+pred_res1_rand <- predict(rangerres_res1_random, data = aim1_data %>% filter(data_type =="test"))
 
-#predictors = c("iMEK",reporters[!reporters %in% c("p.ERK")])
-predictors = c(reporters[!reporters %in% c("p.ERK")])
-response = "p.ERK"
-#rangerres2=ranger(as.formula(paste(response, " ~ iMEK*p.MEK+ ", paste(predictors, collapse= "+"))),
-rangerres2=ranger(as.formula(paste(response, " ~ ", paste(predictors, collapse= "+"))),
-				  data = RF2_data, 
-				  num.trees=1000,
-				  importance = "impurity",
-				  verbose=T,
-				  num.threads = 3)
 
-data.frame(importance = sort(rangerres2$variable.importance,decreasing = T))
+#pred_res2 <- predict(rangerres_res2, data = validation_data)
+#pred_res3 <- predict(rangerres_res3, data = validation_data)
+
+
+comparison_data <-  aim1_data %>% filter(data_type =="test") %>% 
+	select(cell_line,treatment,time,cellID,fileID,p.ERK) %>% #p.Akt.Ser473.,p.S6
+	bind_cols(p.ERK.pred = pred_res1$predictions,
+			  p.ERK.pred_random = pred_res1_rand$predictions) %>%
+	gather("variable","value",starts_with("p.ERK")) %>%
+	mutate(is_prediction = ifelse(grepl("pred",variable),"prediction","data")) %>%
+	mutate(is_prediction = ifelse(grepl("pred_random",variable),"random",is_prediction))
+
+#	
+
+
+
 ```
 
-```{r, fig.height=7, fig.width=10}
-RF2_valid_data <- pERK_validation_data %>% mutate(p.MEK = ifelse(treatment=="iMEK",0,p.MEK))
-
-pred.p.ERK_RF2 <- predict(rangerres2, data = RF2_valid_data)
-
-RF2_valid_data %>% 
-	select(cell_line,treatment,time,time_course,p.ERK) %>%
-	bind_cols(p.ERK.pred = pred.p.ERK_RF2$predictions) %>%
+```{r, fig.height=6, fig.width=10}
+# plot the p-ERK prediction and data
+comparison_data %>% 
+	#gather(key = "variable",value = "value",-cell_line,-treatment,-time,-cellID,-fileID) %>%
+	filter(grepl("p.ERK",variable,fixed = T)) %>%
+	filter(cell_line == "HCC70") %>%
+	filter(treatment == "iPKC") %>%
 	ggplot() +
-	geom_point(aes(time,p.ERK,col="data")) + 
-	geom_point(aes(time,p.ERK.pred,col="pred"))  + 
-	geom_line(aes(time,p.ERK, col="data")) + 
-	geom_line(aes(time,p.ERK.pred,col="pred")) +
+	geom_violin(aes(x=as.factor(time), y=value,fill=is_prediction), scale = "count") +
 	facet_grid(treatment~cell_line) +
-	scale_color_manual(values = c("data" = "black", "pred" = "red")) + 
-	theme_bw() + 
-	ggtitle("p-ERK prediciton in validation data")
-
+	scale_fill_manual(values = c("data" = "black", "prediction" = "red","random"="green")) + 
+	theme_bw() + xlab("time") + ylab("signal") + #guides(fill="none") + 
+	ggtitle("p-ERK prediciton in HCC70, iPKC")
+ggsave("./figures/aim1_HCC70_iPKC_timecourse.pdf",plot=gg,width = 7,height = 2)
 ```
 
-```{r,fig.width=9,fig.height=3}
-RF2_valid_data %>% 
-	select(cell_line,treatment,time,time_course,p.ERK) %>%
-	bind_cols(p.ERK.pred = pred.p.ERK_RF2$predictions) %>%
-	group_by(cell_line,treatment) %>%
-	summarise(RMSE = sqrt(sum((p.ERK - p.ERK.pred)^2)/n()),
-			  corr = cor(p.ERK, p.ERK.pred)) %>%
+
+```{r,fig.width=20}
+
+comparison_data %>% 
 	ggplot() +
-	geom_col(aes(x=treatment, y=RMSE,fill=treatment)) +
-	geom_hline(aes(yintercept = mean(RMSE))) + 
-	facet_grid(~cell_line)+ theme_bw()+ ylim(0,1)+
-	theme(axis.text.x = element_text(angle = 90, hjust = 1)) 
+	geom_violin(aes(x=1, y=value,fill=is_prediction), scale = "count") +
+	facet_grid(treatment~cell_line+variable) +
+	theme_bw() + theme(axis.text.x = element_blank(),axis.ticks.x =  element_blank()) + xlab("") + ylab("signal") + 
+	ggtitle("RF prediction in test cell lines")
+ggsave("./figures/aim1_RF_all_v1.pdf",plot = gg,width = 13,height = 6)
 ```
 
+```{r, fig.height=30, fig.width=10}
+# plot the p-ERK prediction and data
+gg =comparison_data %>% 
+	#filter(cell_line == "T47D") %>%
+	ggplot() + 
+	geom_point(aes(x=`p.ERK`, y=`p.ERK.pred`)) +
+	facet_grid(cell_line+treatment~time) +
+	theme_bw() + 
+	ggtitle("p-ERK correlation in conditions")
+```
+# Metrics for AIM 1
+A.  distance of predicted and measured markers in individual cells
+B. correlation of predicted and measured markers
+C. distance of distributions
 
 
-## 1.3 RF treatment information, no downstream
-
-Remove the nodes from the features that are downstream of ERK
+## distance of predicted and measured markers in individual cells
 
 
 ```{r}
-# we start from pERK_training_data
-RF3_data <- pERK_training_data %>% 
-	mutate(p.MEK = ifelse(treatment=="iMEK",0,p.MEK))
+ucid = unique(comparison_data$cellID)
+ggdat = comparison_data %>% 
+	#gather(key = "variable",value = "value",-cell_line,-treatment,-time,-cellID,-fileID) %>%
+	#mutate(is_prediction = grepl("pred",variable)) %>%
+	filter(cellID <100) %>%
+	filter(grepl("p.ERK",variable,fixed = T)) %>%
+	filter(cell_line == "HCC70") %>%
+	filter(treatment == "iPKC") %>%
+	filter(time==0)
 
-reporters <-  colnames(RF3_data)[6:39]
+ggdat%>%ggplot() +
+	geom_dotplot(aes(x=ifelse(is_prediction,"predicted","test"), y=value),
+				 fill= rgb(colorRamp(colors=RColorBrewer::brewer.pal(11,"Spectral"))(ggdat$cellID/max(ggdat$cellID)),maxColorValue = 256),
+				 binaxis='y',binpositions="all", stackdir='center',dotsize = 0.8) +
+	theme_bw()  + xlab("") + ylab("signal") 
 
-#predictors = c("iMEK",reporters[!reporters %in% c("p.ERK")])
-predictors = c(reporters[!reporters %in% c("p.ERK", "p.p90RSK","p.MKK4","p.S6K","p.MAPKAPK2","p.p38")])
-response = "p.ERK"
-#rangerres2=ranger(as.formula(paste(response, " ~ iMEK*p.MEK+ ", paste(predictors, collapse= "+"))),
-rangerres3=ranger(as.formula(paste(response, " ~ ", paste(predictors, collapse= "+"))),
-				  data = RF3_data, 
-				  num.trees=1000,
-				  importance = "impurity",
-				  verbose=T,
-				  num.threads = 3)
+gg1 =  ggdat%>% filter(is_prediction) %>%ggplot() +
+	geom_dotplot(aes(x=ifelse(is_prediction,"predicted","test"), y=value,fill=factor(cellID)),
+				 stackgroups = TRUE,
+				 binaxis='y',binpositions="all", stackdir='center',dotsize = 1.2) +
+	theme_bw()  + xlab("") + ylab("signal") +guides(fill="none")+ ylim(0,5)
+ggsave("./figures/aim1_HCC70_iPKT_T0_dot_pred.pdf",plot = gg1,width = 2.5,height = 4)
 
-data.frame(importance = sort(rangerres3$variable.importance,decreasing = T))
+gg2 = ggdat%>% filter(!is_prediction) %>%ggplot() +
+	geom_dotplot(aes(x=ifelse(is_prediction,"predicted","test"), y=value,fill=factor(cellID)),
+				 stackgroups = TRUE,
+				 binaxis='y',binpositions="all",stackdir='center',dotsize = 0.8) +
+	theme_bw()  + xlab("") + ylab("signal") +guides(fill="none")+ ylim(0,5) 
+ggsave("./figures/aim1_HCC70_iPKT_T0_dot_test.pdf",plot = gg2,width = 2.5,height = 4)
+
+gg = ggdat%>%ggplot() +
+	geom_jitter(aes(x=ifelse(is_prediction,"predicted","test"), y=value),width = 0.2,
+				color= rgb(colorRamp(colors=RColorBrewer::brewer.pal(11,"Spectral"))(ggdat$cellID/max(ggdat$cellID)),maxColorValue = 256)) +
+	theme_bw()  + xlab("") + ylab("signal") 
+
+
+ggsave("./figures/aim1_HCC70_iPKT_T0_dot_v1.pdf",plot = gg,width = 5,height = 4)
 ```
 
-```{r, fig.height=7, fig.width=10}
-RF3_valid_data <- pERK_validation_data %>% mutate(p.MEK = ifelse(treatment=="iMEK",0,p.MEK))
-
-pred.p.ERK_RF3 <- predict(rangerres3, data = RF3_valid_data)
-
-RF3_valid_data %>% 
-	select(cell_line,treatment,time,time_course,p.ERK) %>%
-	bind_cols(p.ERK.pred = pred.p.ERK_RF3$predictions) %>%
-	ggplot() +
-	geom_point(aes(time,p.ERK,col="data")) + 
-	geom_point(aes(time,p.ERK.pred,col="pred"))  + 
-	geom_line(aes(time,p.ERK, col="data")) + 
-	geom_line(aes(time,p.ERK.pred,col="pred")) +
-	facet_grid(treatment~cell_line) +
-	scale_color_manual(values = c("data" = "black", "pred" = "red")) + 
-	theme_bw() + 
-	ggtitle("p-ERK prediciton in validation data")
-
+compute RMSE for the this set:
+```{r}
+ggdat %>% select(-is_prediction) %>% spread(variable,value) %>% summarise(RMSE = sqrt(sum((p.ERK - p.ERK.pred)^2/n())))
 ```
-
-```{r,fig.width=9,fig.height=3}
-RF3_valid_data %>% 
-	select(cell_line,treatment,time,time_course,p.ERK) %>%
-	bind_cols(p.ERK.pred = pred.p.ERK_RF3$predictions) %>%
-	group_by(cell_line,treatment) %>%
-	summarise(RMSE = sqrt(sum((p.ERK - p.ERK.pred)^2)/n()),
-			  corr = cor(p.ERK, p.ERK.pred)) %>% 
-	ggplot() +
-	geom_col(aes(x=treatment, y=RMSE,fill=treatment)) +
-	geom_hline(aes(yintercept = mean(RMSE))) + 
-	facet_grid(~cell_line)+ theme_bw()+ ylim(0,1.2)+
-	theme(axis.text.x = element_text(angle = 90, hjust = 1)) + ggtitle(paste0("Prediction error"))
+```{r}
+RMSE_data <- comparison_data %>% group_by(cell_line,time,treatment) %>%summarise(RMSE = sqrt(sum((p.ERK - p.ERK.pred)^2/n()))) %>% arrange(RMSE)
+RMSE_data
 ```
 
 
 
 
+## correlation of predicted and measured markers
+```{r}
+# plot the p-ERK prediction and data
+corr_data = comparison_data %>% 
+	filter(cellID <100) %>%
+	filter(cell_line == "HCC70") %>%
+	filter(treatment == "iPKC") %>%
+	filter(time==0)
+gg_corr <- corr_data %>%	ggplot(aes(x=`p.ERK`, y=`p.ERK.pred`)) +
+	geom_point(col=rgb(colorRamp(colors=RColorBrewer::brewer.pal(11,"Spectral"))(corr_data$cellID/max(corr_data$cellID)),maxColorValue = 256)) +
+	xlab("predicted") + ylab("test") + coord_equal() + xlim(0,6) + ylim(0,6) + geom_smooth(method="lm",fullrange=T) +
+	theme_bw() 
+ggsave("./figures/aim1_HCC70_iPKT_T0_correlation_v1.pdf",plot = gg_corr,width = 5,height = 4)
+```
+
+```{r}
+corr_data %>% group_by(cell_line,time,treatment) %>%summarise(corr.coef = cor(p.ERK, p.ERK.pred)) %>% arrange(corr.coef)
+corr_coeff_data<- comparison_data %>% group_by(cell_line,time,treatment) %>%summarise(corr.coef = cor(p.ERK, p.ERK.pred)) %>% arrange(corr.coef)
+corr_coeff_data
+```
+
+
+```{r,fig.width=3,fig.height=3}
+corr_coeff_data %>% full_join(RMSE_data, by = c("cell_line", "time", "treatment")) %>%
+	ggplot(aes(corr.coef,RMSE)) + geom_point() + geom_smooth(method="lm") + theme_bw() + theme(aspect.ratio = 1)
+
+RMSE_corr_stats=corr_coeff_data %>% full_join(RMSE_data, by = c("cell_line", "time", "treatment"))
+cor.test(RMSE_corr_stats$RMSE,RMSE_corr_stats$corr.coef)
+```
+
+
+## Distance of distributions
+
+- Kullbach-leibler distance
+```{r}
+
+#install.packages("philentropy")
+library(philentropy)
+library(purrr)
+gg_dens <-  comparison_data %>% 
+	filter(cellID <100) %>%
+	filter(cell_line == "HCC70") %>%
+	filter(treatment == "iPKC") %>%
+	filter(time==0) %>% gather(variable,value,p.ERK,p.ERK.pred) %>%
+	ggplot() + geom_density(aes(value,group=variable,fill=variable),alpha=0.5) + theme_bw()
+ggsave("./figures/aim1_HCC70_iPKT_T0_densities_v1.pdf",plot = gg_dens,width = 5,height = 4)
+
+
+KL_data = comparison_data %>% 
+	filter(cellID <100) %>%
+	filter(cell_line == "HCC70") %>%
+	filter(treatment == "iPKC") %>%
+	filter(time==0) %>% select(p.ERK,p.ERK.pred)
+
+# estimate densitites at same points:
+test_dens <- density(x = KL_data$p.ERK,from = 0,to = 10,n = 64)
+pred_dens <- density(x = KL_data$p.ERK.pred,from = 0,to = 10,n = 64)
+all(test_dens$x==pred_dens$x)
+
+KL(rbind(test=test_dens$y,pred=pred_dens$y),est.prob = "empirical")
+KL(rbind(pred=pred_dens$y,test=test_dens$y),est.prob = "empirical")
+```
+
+
+
+
+```{r}
+library(purrr)
+tmp <-  comparison_data %>% 
+	select(-cellID,-fileID) %>%
+	gather(reporter, value, -cell_line,-treatment,-time) %>%
+	mutate(condition=ifelse(grepl("pred",reporter),"prediction","test")) %>%
+	mutate(reporter = gsub(".pred","",reporter)) %>%
+	group_by(cell_line,treatment,time,reporter) %>% nest() %>%
+	mutate(density_data = map(data,function(df){
+		
+		test_data <- df %>% filter(condition=="test") %>% pull(value)
+		prediction_data <- df %>% filter(condition=="prediction") %>% pull(value)
+		test_dens <- density(x = test_data,from = 0,to = 10,n = 64)
+		pred_dens <- density(x = prediction_data,from = 0,to = 10,n = 64)
+		KL(rbind(test=test_dens$y,pred=pred_dens$y),est.prob = "empirical")
+		
+		
+		
+	}))
+
+
+
+filter(cell_line == "HCC70") %>%
+	filter(treatment == "iPKC") %>%
+	filter(time==0) %>% gather(variable,value,p.ERK,p.ERK.pred) %>%
+	ggplot() + geom_density(aes(value,group=variable,fill=variable),alpha=0.5) + theme_bw()
+ggsave("./figures/aim1_HCC70_iPKT_T0_densities_v1.pdf",plot = gg_dens,width = 5,height = 4)
+
+
+KL_data = comparison_data %>% 
+	filter(cellID <100) %>%
+	filter(cell_line == "HCC70") %>%
+	filter(treatment == "iPKC") %>%
+	filter(time==0) %>% select(p.ERK,p.ERK.pred)
+
+# estimate densitites at same points:
+test_dens <- density(x = KL_data$p.ERK,from = 0,to = 10,n = 64)
+pred_dens <- density(x = KL_data$p.ERK.pred,from = 0,to = 10,n = 64)
+all(test_dens$x==pred_dens$x)
+
+KL(rbind(test=test_dens$y,pred=pred_dens$y),est.prob = "empirical")
+KL(rbind(pred=pred_dens$y,test=test_dens$y),est.prob = "empirical")
+```
+
+
+
+## Correlation metric
+
+```{r,fig.height=5,fig.width=5}
+validation_data %>% filter(treatment=="EGF",time %in% c(0,9),cell_line == "HCC2218") %>%
+	mutate(condition = ifelse(time==9,"test","prediciton")) %>% 
+	ggplot(aes(p.ERK,p.p90RSK,group=condition)) + geom_point(aes(col=condition)) +
+	geom_smooth(method="lm")+ theme_bw() +coord_equal()+ ggtitle("marker correlation") + facet_wrap(~condition) 
+```
 
