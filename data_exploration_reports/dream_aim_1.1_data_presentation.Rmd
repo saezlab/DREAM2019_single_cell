@@ -1,0 +1,163 @@
+---
+title: "dream aim 1.1 description"
+author: "Attila Gabor"
+date: "6/5/2019"
+output: html_document
+---
+here we produce some figures to explain the goals of AIM 1.1
+
+the slected cell-lines here are out-dated. Later we have revised the slection.
+
+
+```{r include=FALSE}
+library(tidyverse)
+library(DBI)
+library(RSQLite)
+library(progress)
+```
+
+```{r}
+con <- dbConnect(RSQLite::SQLite(), "./data/cleaned_single_cell_data/single_cell_dream_cls.sqlite")
+```
+
+Explore the database (tutorial-ish)
+
+Get available cell-lines. Each cell-lines are stored in a table. 
+```{r}
+tables <-  dbListTables(con)
+cols <- dbListFields(con,tables[[1]])
+timepoints <- dbGetQuery(con,paste0("SELECT DISTINCT time FROM  ",dbQuoteIdentifier(con,tables[[1]])))
+treatments <- dbGetQuery(con,paste0("SELECT DISTINCT treatment FROM  ",dbQuoteIdentifier(con,tables[[1]])))
+```
+
+
+## DREAM AIM 1 data preprocessing
+First we load the cell-lines for the training and for the test.
+We specify the features and response variables. 
+Remove the response variables from the test set.
+
+```{r}
+training_celllines = c('AU565','BT483','CAL148', 'SKBR3','HBL100', 'HCC2185','MCF10A')
+test_celllines = c('T47D','HCC1806','HCC2218', 'HCC70','UACC893')
+
+training_size_per_cond = 500
+test_size_per_cond = 500
+
+bar = progress::progress_bar$new(format = "  Processing [:bar] :percent eta: :eta",
+								 total = length(training_celllines))
+
+training_data = sapply(training_celllines, function(cl){
+	bar$tick()
+	
+	# load cell_line and limit the number of cells
+	tmp = dbReadTable(con,  dbQuoteIdentifier(con,cl)) %>% 
+		as_tibble() %>%
+		group_by(treatment,time) %>% 
+		filter(row_number()<training_size_per_cond)
+	
+	
+},simplify = F)
+
+training_data = do.call("rbind",training_data) %>% as_tibble()
+
+bar = progress::progress_bar$new(format = "  Processing [:bar] :percent eta: :eta",
+								 total = length(test_celllines))
+test_data = sapply(test_celllines, function(cl){
+	bar$tick()
+	
+	# load cell_line and limit the number of cells
+	tmp = dbReadTable(con,  dbQuoteIdentifier(con,cl)) %>% 
+		as_tibble() %>%
+		group_by(treatment,time) %>% 
+		filter(row_number()<test_size_per_cond)
+},simplify = F)	
+
+test_data = do.call("rbind",test_data) %>% as_tibble()
+
+
+aim1_data = training_data %>% mutate(data_type = "training") %>%
+	bind_rows(test_data %>% mutate(data_type = "test"))
+
+```
+
+
+
+```{r}
+reporters <- colnames(training_data)[6:42]
+#reporters <- setdiff(colnames(training_data)[6:42],c("p.HER2", "p.PLCg2"))
+response = c("p.ERK", "p.Akt.Ser473.","p.S6","p.HER2", "p.PLCg2")
+stopifnot(all(response %in% reporters))
+
+predictors = setdiff(reporters, response)
+```
+
+## 1. Phospho-prediction on single cell level
+
+Visualise the data outline as a table / heatmap
+```{r}
+pheat_data = aim1_data %>% 
+	group_by(cell_line, treatment,data_type) %>% summarise_at(reporters,~mean(.)) %>% 
+	ungroup() %>%
+	gather("reporter","value",-cell_line,-treatment,-data_type) %>%
+	mutate(condition = paste(reporter,treatment,sep = "_")) %>%
+	select(reporter,cell_line,condition,value) %>%
+	mutate(value = ifelse(reporter %in% response,-1,1)) %>%
+	mutate(value = ifelse(cell_line %in% training_celllines,2,value)) %>%
+	spread(cell_line,value,fill = NA) 
+
+row_names = pheat_data %>% group_by(reporter) %>% mutate(row_name = ifelse(row_number() == round(n()/2),reporter,"")) %>%
+	ungroup() %>%
+	pull(row_name)
+
+#column_to_rownames("row_name") %>%
+
+pheat_res = pheat_data %>%
+	select(-reporter,-condition) %>% 
+	select(training_celllines,test_celllines)%>%
+	pheatmap::pheatmap(mat = ., color = c("#E41A1C", "#377EB8", "#4DAF4A") ,
+					   cluster_rows = F,
+					   cluster_cols = F,
+					   #   border_color=NA,
+					   na_col = "grey", labels_row = row_names)
+ggsave("./figures/aim1_data.pdf",plot = pheat_res$gtable,width = 5,height = 7)
+
+```
+Visualise with the emphasiz on single cell:
+
+select a cell line from training and one from validation and show which data shall be imputed. 
+
+```{r,fig.width=6, fig.height=3}
+vis_data_1 <-  aim1_data %>%
+	filter(cell_line %in% c("AU565","HCC1806")) %>%
+	mutate(cell_line = ifelse(cell_line=="AU565","training","test")) %>%
+	filter(time == 7, treatment=="iMEK") %>% ungroup %>%
+	group_by(cell_line,time,treatment) %>% 
+	filter(fileID == min(fileID)) %>% ungroup %>%
+	filter(cellID < 100) %>%
+	gather("reporter","value",-cell_line,-treatment,-time,-cellID,-fileID,-data_type) %>%
+	filter(!  (data_type == "test" & reporter %in% response )) %>%
+	filter(reporter %in%  c("p.ERK","p.S6","p.MEK","p.MKK4","p.p90RSK","p.S6K")) %>%
+	mutate(fill_col = ifelse(reporter %in% c("p.ERK","p.S6"),"response","predictor")) %>%
+	filter(!is.na(value))
+
+gg_aim_1_scell_fig1 = vis_data_1  %>%	ggplot(data=., aes(factor(""),value)) +
+	geom_dotplot(fill=rgb(colorRamp(colors=RColorBrewer::brewer.pal(11,"Spectral"))(vis_data_1$cellID/max(vis_data_1$cellID)),maxColorValue = 256),
+				 binaxis='y',binwidth=0.1 , binpositions="all", stackdir='center',dotsize = 8,) + guides(fill="none")+
+	facet_grid(cell_line ~ reporter) + theme_bw() + xlab("condition")
+print(gg_aim_1_scell_fig1)
+ggsave(plot=gg_aim_1_scell_fig1,filename = "./figures/aim1_single_cell_details_dotplot_v1.pdf",height = 3,width = 6)
+```
+
+For AIM 1.2 we cannot identify cells, so we can plot each cell without a color. 
+we will compare distributions.
+
+
+```{r,fig.width=6, fig.height=3}
+gg_aim_1_2_scell_fig1 <- vis_data_1  %>%	ggplot(data=., aes(factor(""),value)) +
+	geom_dotplot(fill="white",#fill=rgb(colorRamp(colors=RColorBrewer::brewer.pal(11,"Spectral"))(vis_data_1$cellID/max(vis_data_1$cellID)),maxColorValue = 256),
+				 #col=rgb(colorRamp(colors=RColorBrewer::brewer.pal(11,"Spectral"))(vis_data_1$cellID/max(vis_data_1$cellID)),maxColorValue = 256),
+				 binaxis='y',binwidth=0.1 , binpositions="all", stackdir='center',dotsize = 5,) + guides(fill="none")+
+	#geom_violin(aes(col=fill_col,fill=fill_col),alpha=.5,scale = "count",size=2) +
+	facet_grid(cell_line ~ reporter) + theme_bw() + xlab("condition")
+ggsave(plot=gg_aim_1_2_scell_fig1,filename = "./figures/aim1_2_single_cell_details_dotplot_v1.pdf",height = 3,width = 6)
+```
