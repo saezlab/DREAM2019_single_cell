@@ -1,0 +1,355 @@
+---
+title: "DREAM AIM I data"
+author: "Attila Gabor"
+date: "4/26/2019"
+output: html_document
+---
+
+
+```{r include=FALSE}
+library(tidyverse)
+library(DBI)
+library(RSQLite)
+library(progress)
+```
+# Median data interpolation
+the code will skip this section and data is read from the disk. 
+
+Load the median data to find suitable cell-lines
+```{r,eval=FALSE}
+median_data <- read_rds("./data/median_data/median_all_reporters_mine.rds") %>% as_tibble()
+```
+preparing time-courses:
+we interpolate the data to the same timepoints:
+
+```{r,eval=FALSE}
+# uncomment if we use Marco's data
+# median_data <- median_data %>% mutate(time = as.character(time)) %>%
+# 	mutate(time = ifelse(time=="0short","0",time)) %>%
+# 	mutate(time = ifelse(is.na(time),"0",time)) %>%
+# 	mutate(time = as.numeric(as.character(time))) 
+
+median_data%>%pull(time) %>% table()
+base_time = c(0,5.5,7,9,13,17,23,30,40,60)
+```
+In case of Marco's median data interpolation in 2 steps:
+1. interpolate for the basal time per time_course
+ - first we filter out treatment full, because that has only time 0 so we dont want to interpolate.
+ - for each reporter time_course we interpolate for the base_timepoints, defined above
+2. interpolate (average) between the time_courses
+
+```{r,eval=FALSE}
+median_interpolated_data = median_data %>% select(-`dmt$cellcount`) %>% filter(treatment != "full") %>%
+	gather(reporter,value,-cell_line,-treatment,-time,-time_course) %>%
+	group_by(cell_line,treatment,time_course,reporter) %>% # interpolating per time_course!
+	nest() %>%
+	mutate(interp_value = map(data, function(data){
+	
+		out = approx(x = data$time,y = data$value,xout = base_time,method ="linear",rule = 2)
+		data.frame(time=out$x,value=out$y)
+	}
+		))%>% unnest(interp_value) %>%
+	# bind the EGF treatment: this has only time 0
+	bind_rows( median_data %>% select(-`dmt$cellcount`) %>%
+			   	filter(treatment == "full") %>%
+			   	gather(reporter,value,-cell_line,-treatment,-time,-time_course)  
+			   ) %>%
+
+	group_by(cell_line,treatment,time,reporter) %>% # averaging over time_course!
+	summarise(value = mean(value))
+
+if(FALSE) saveRDS(median_interpolated_data,"./data/median_data/interpolated_median_allsamples_nocontrols_withcellcount.rds")
+```
+
+
+My data: time is already handled, but average over the fileID
+
+- remove temporarly the full treatment --> no time course
+- averageing over FileID can be tricky, because replicates
+- average the value for each condition (cellline/treatment/time/reporter)
+
+```{r,eval=FALSE}
+median_interpolated_data = median_data %>% filter(treatment != "full") %>%  
+	gather(reporter,value,-cell_line,-treatment,-time,-fileID) %>%
+	group_by(cell_line,treatment,time,reporter) %>%
+	summarise(value = mean(value, na.rm = TRUE)) %>%  # average in each condition over fileID
+	ungroup() %>%
+	group_by(cell_line,treatment,reporter) %>% # interpolating in time
+	nest() %>%
+	mutate(interp_value = map(data, function(data){
+		#browser()
+		if(sum(!is.na(data$value))<2) {
+			# TODO: if there is 1 numeric value we throw it away
+		 	out = data.frame(time=base_time,value=NA)
+		 	return(out)
+		 }
+		out = approx(x = data$time,y = data$value,xout = base_time,method ="linear",rule = 2)
+		data.frame(time=out$x,value=out$y)
+	}
+	))%>% unnest(interp_value) %>%
+	# bind the EGF treatment: this has only time 0
+	bind_rows( median_data %>% 
+			   	filter(treatment == "full") %>%
+			   	gather(reporter,value,-cell_line,-treatment,-time, -fileID) %>%
+			group_by(cell_line,treatment,time,reporter) %>% 
+			summarise(value = mean(value, na.rm = TRUE) ) # mean over fileID
+			   	
+	) %>%
+	ungroup() 
+
+if(FALSE) write_rds(median_interpolated_data,"./data/median_data/interpolated_median_all_reporters_mine.rds")
+```
+
+### Load the interpolated data
+
+```{r}
+median_interpolated_data <- read_rds("./data/median_data/interpolated_median_all_reporters_mine.rds")
+```
+
+# Clustering cell-lines
+
+- remove the cell-lines with missing HER2/plcg values --> prevent the clustering and 
+they cannot be used to train or validate the models in AIM 1.1
+```{r clean_na }
+median_interpolated_data %>% filter(reporter =="p.HER2") %>% filter(is.na(value)) %>% 
+	mutate(value  = 1) %>%
+	spread(cell_line,value, drop=FALSE)
+
+```
+
+The first approach: use all reporters
+```{r,fig.height=7,fig.width=7}
+NA_celllines = median_interpolated_data %>% filter(is.na(value)) %>% pull(cell_line) %>% unique()
+
+# heatmap data ----
+hm_data_whole <- median_interpolated_data %>% 
+	filter(! cell_line %in% NA_celllines ) %>%
+	mutate(row_description = paste(reporter, treatment,time,sep = "_")) %>%
+	ungroup()%>%
+	select(row_description,cell_line,value) %>%
+	spread(cell_line,value = value) %>%
+	column_to_rownames("row_description") 
+
+# annotation work ----
+row_labeling_whole = tibble(original_names = rownames(hm_data_whole)) %>%
+	mutate(label = ifelse(grepl("EGF_0",original_names),original_names,""))
+
+
+ph_obj = hm_data_whole %>% pheatmap(cluster_rows = F, clustering_distance_cols = "euclidean", labels_row = row_labeling_whole$label, cutree_cols = 12) 
+
+
+
+col_annotation_whole = data.frame(global_groups = as.factor(cutree(ph_obj$tree_col,k = 12)))
+
+ph_obj = hm_data_whole %>% pheatmap(cluster_rows = F, clustering_distance_cols = "euclidean", labels_row = row_labeling_whole$label, cutree_cols = 12,annotation_col =col_annotation_whole )
+
+```
+
+
+
+In the second approach we select only the reporters that we ask for prediction 
+
+```{r,fig.width=10}
+# heatmap data ----
+NA_celllines = median_interpolated_data %>% filter(is.na(value)) %>% pull(cell_line) %>% unique()
+
+hm_data <- median_interpolated_data %>% 
+	filter(! cell_line %in% NA_celllines ) %>%
+	filter(reporter %in% c("p.ERK","p.Akt.Ser473.","p.S6","p.PLCg2","p.HER2"))%>%
+	mutate(row_description = paste(reporter, treatment,time,sep = "_")) %>%
+	ungroup()%>%
+	select(row_description,cell_line,value) %>%
+	spread(cell_line,value = value) %>%
+	column_to_rownames("row_description") 
+
+
+# annotation work ----
+# this was the old selection
+#training_celllines = setdiff(c('AU565','BT483','CAL148', 'SKBR3','HBL100', 'HCC2185','MCF10A'),NA_celllines)
+#test_celllines = setdiff(c('T47D','HCC1806','HCC2218', 'HCC70','UACC893'),NA_celllines)
+
+#cell_lines = median_interpolated_data %>% pull(cell_line) %>% unique() %>% as.character()
+# 
+# col_annotation = data.frame(cell_lines)%>% 
+# 	mutate(purpose = ifelse(cell_lines %in%  training_celllines, "training",
+# 							ifelse(cell_lines %in% test_celllines,"test","not_selected"))) %>%
+# 	column_to_rownames("cell_lines")
+# 
+# ann_colors = list(purpose = c(training="green",test="red",not_selected="white"))
+
+col_annotation <- col_annotation_whole%>% rownames_to_column("cell_line") %>% mutate(global_groups = ifelse(global_groups %in% c(1,2,3,4,7,8,10),global_groups,"-")) %>% column_to_rownames("cell_line")
+
+
+
+row_labeling = tibble(original_names = rownames(hm_data)) %>%
+	mutate(label = ifelse(grepl("_0",original_names),original_names,""))
+
+# plotting -----
+library(pheatmap)
+
+
+
+hm_data %>% pheatmap(cluster_rows = F,annotation_col = col_annotation, clustering_distance_cols = "euclidean", labels_row = row_labeling$label, cutree_cols = 7) 
+```
+
+
+# Number of distinct clusters
+we dont need this. 
+```{r, eval=FALSE}
+#install.packages("NbClust")
+library(NbClust)
+```
+```{r, eval = FALSE}
+nb_res <- NbClust(data = hm_data, distance = "euclidean", min.nc = 3, max.nc = 10, method = "complete", index = "alllong")
+```
+
+
+
+
+# single cell stuff
+
+```{r}
+con <- dbConnect(RSQLite::SQLite(), "./data/cleaned_single_cell_data/single_cell_dream_cls.sqlite")
+```
+
+Explore the database (tutorial-ish)
+
+Get available cell-lines. Each cell-lines are stored in a table. 
+```{r}
+tables <-  dbListTables(con)
+cols <- dbListFields(con,tables[[1]])
+timepoints <- dbGetQuery(con,paste0("SELECT DISTINCT time FROM  ",dbQuoteIdentifier(con,tables[[1]])))
+treatments <- dbGetQuery(con,paste0("SELECT DISTINCT treatment FROM  ",dbQuoteIdentifier(con,tables[[1]])))
+```
+
+
+## DREAM AIM 1 data preprocessing
+First we load the cell-lines for the training and for the test.
+We specify the features and response variables. 
+Remove the response variables from the test set.
+
+```{r}
+training_celllines = c('AU565','BT483','CAL148', 'SKBR3','HBL100', 'HCC2185','MCF10A')
+test_celllines = c('T47D','HCC1806','HCC2218', 'HCC70','UACC893')
+
+training_size_per_cond = 500
+test_size_per_cond = 500
+
+bar = progress::progress_bar$new(format = "  Processing [:bar] :percent eta: :eta",
+								 total = length(training_celllines))
+
+training_data = sapply(training_celllines, function(cl){
+	bar$tick()
+	
+	# load cell_line and limit the number of cells
+	tmp = dbReadTable(con,  dbQuoteIdentifier(con,cl)) %>% 
+		as_tibble() %>%
+		group_by(treatment,time) %>% 
+		filter(row_number()<training_size_per_cond)
+	
+	
+},simplify = F)
+
+training_data = do.call("rbind",training_data) %>% as_tibble()
+
+bar = progress::progress_bar$new(format = "  Processing [:bar] :percent eta: :eta",
+								 total = length(test_celllines))
+test_data = sapply(test_celllines, function(cl){
+	bar$tick()
+	
+	# load cell_line and limit the number of cells
+	tmp = dbReadTable(con,  dbQuoteIdentifier(con,cl)) %>% 
+		as_tibble() %>%
+		group_by(treatment,time) %>% 
+		filter(row_number()<test_size_per_cond)
+},simplify = F)	
+
+test_data = do.call("rbind",test_data) %>% as_tibble()
+
+
+aim1_data = training_data %>% mutate(data_type = "training") %>%
+	bind_rows(test_data %>% mutate(data_type = "test"))
+
+```
+
+
+
+```{r}
+reporters <- colnames(training_data)[6:42]
+#reporters <- setdiff(colnames(training_data)[6:42],c("p.HER2", "p.PLCg2"))
+response = c("p.ERK", "p.Akt.Ser473.","p.S6","p.HER2", "p.PLCg2")
+stopifnot(all(response %in% reporters))
+
+predictors = setdiff(reporters, response)
+```
+
+## 1. Phospho-prediction on single cell level
+
+Visualise the data outline as a table / heatmap
+```{r}
+pheat_data = aim1_data %>% 
+	group_by(cell_line, treatment,data_type) %>% summarise_at(reporters,~mean(.)) %>% 
+	ungroup() %>%
+	gather("reporter","value",-cell_line,-treatment,-data_type) %>%
+	mutate(condition = paste(reporter,treatment,sep = "_")) %>%
+	select(reporter,cell_line,condition,value) %>%
+	mutate(value = ifelse(reporter %in% response,-1,1)) %>%
+	mutate(value = ifelse(cell_line %in% training_celllines,2,value)) %>%
+	spread(cell_line,value,fill = NA) 
+
+row_names = pheat_data %>% group_by(reporter) %>% mutate(row_name = ifelse(row_number() == round(n()/2),reporter,"")) %>%
+	ungroup() %>%
+	pull(row_name)
+
+#column_to_rownames("row_name") %>%
+
+pheat_res = pheat_data %>%
+	select(-reporter,-condition) %>% 
+	select(training_celllines,test_celllines)%>%
+	pheatmap::pheatmap(mat = ., color = c("#E41A1C", "#377EB8", "#4DAF4A") ,
+					   cluster_rows = F,
+					   cluster_cols = F,
+					   #   border_color=NA,
+					   na_col = "grey", labels_row = row_names)
+ggsave("./figures/aim1_data.pdf",plot = pheat_res$gtable,width = 5,height = 7)
+
+```
+Visualise with the emphasiz on single cell:
+
+select a cell line from training and one from validation and show which data shall be imputed. 
+
+```{r,fig.width=6, fig.height=3}
+vis_data_1 <-  aim1_data %>%
+	filter(cell_line %in% c("AU565","HCC1806")) %>%
+	mutate(cell_line = ifelse(cell_line=="AU565","training","test")) %>%
+	filter(time == 7, treatment=="iMEK") %>% ungroup %>%
+	group_by(cell_line,time,treatment) %>% 
+	filter(fileID == min(fileID)) %>% ungroup %>%
+	filter(cellID < 100) %>%
+	gather("reporter","value",-cell_line,-treatment,-time,-cellID,-fileID,-data_type) %>%
+	filter(!  (data_type == "test" & reporter %in% response )) %>%
+	filter(reporter %in%  c("p.ERK","p.S6","p.MEK","p.MKK4","p.p90RSK","p.S6K")) %>%
+	mutate(fill_col = ifelse(reporter %in% c("p.ERK","p.S6"),"response","predictor")) %>%
+	filter(!is.na(value))
+
+gg_aim_1_scell_fig1 = vis_data_1  %>%	ggplot(data=., aes(factor(""),value)) +
+	geom_dotplot(fill=rgb(colorRamp(colors=RColorBrewer::brewer.pal(11,"Spectral"))(vis_data_1$cellID/max(vis_data_1$cellID)),maxColorValue = 256),
+				 binaxis='y',binwidth=0.1 , binpositions="all", stackdir='center',dotsize = 8,) + guides(fill="none")+
+	facet_grid(cell_line ~ reporter) + theme_bw() + xlab("condition")
+print(gg_aim_1_scell_fig1)
+ggsave(plot=gg_aim_1_scell_fig1,filename = "./figures/aim1_single_cell_details_dotplot_v1.pdf",height = 3,width = 6)
+```
+
+For AIM 1.2 we cannot identify cells, so we can plot each cell without a color. 
+we will compare distributions.
+
+
+```{r,fig.width=6, fig.height=3}
+gg_aim_1_2_scell_fig1 <- vis_data_1  %>%	ggplot(data=., aes(factor(""),value)) +
+	geom_dotplot(fill="white",#fill=rgb(colorRamp(colors=RColorBrewer::brewer.pal(11,"Spectral"))(vis_data_1$cellID/max(vis_data_1$cellID)),maxColorValue = 256),
+				 #col=rgb(colorRamp(colors=RColorBrewer::brewer.pal(11,"Spectral"))(vis_data_1$cellID/max(vis_data_1$cellID)),maxColorValue = 256),
+				 binaxis='y',binwidth=0.1 , binpositions="all", stackdir='center',dotsize = 5,) + guides(fill="none")+
+	#geom_violin(aes(col=fill_col,fill=fill_col),alpha=.5,scale = "count",size=2) +
+	facet_grid(cell_line ~ reporter) + theme_bw() + xlab("condition")
+ggsave(plot=gg_aim_1_2_scell_fig1,filename = "./figures/aim1_2_single_cell_details_dotplot_v1.pdf",height = 3,width = 6)
+```
