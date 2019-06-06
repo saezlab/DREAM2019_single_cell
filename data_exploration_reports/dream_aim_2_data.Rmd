@@ -1,0 +1,157 @@
+---
+title: "AIM 2 data"
+author: "Attila Gabor"
+date: "6/4/2019"
+output: html_document
+---
+
+```{r include=FALSE}
+library(tidyverse)
+library(pheatmap)
+library(RColorBrewer)
+```
+
+### Data import
+
+```{r}
+median_interpolated_data <- read_rds("./data/median_data/interpolated_median_all_reporters_mine.rds")
+proteomics_raw <- readRDS("./data/proteomics/MSstat_groupComparison_selceted.rds") %>% as_tibble()
+rnaseq_raw <- readRDS("./data/genomics/dat_RNAseq_Marcotte.rds") %>% as_tibble()
+```
+### cell-lines used in earlier aims
+
+```{r}
+cell_line_usage <- readxl::read_excel("./data/cell_line_distribution.xlsx",sheet = 1)
+available_cellines <- cell_line_usage %>% filter(test_cell_line==0,training_cell_line==0) %>% pull(cell_lines)
+```
+
+
+
+## Proteomics data of cell- lines
+
+
+```{r}
+hm_data_proteomics <- 
+	proteomics_raw %>% 
+	mutate(cell_line = gsub("normal_vs_","",Label)) %>%
+	#filter(cell_line %in% available_cellines) %>%
+	select(Protein,cell_line,log2FC) %>%
+	mutate(log2FC_mod = ifelse(is.infinite(log2FC),NA,log2FC)) %>%
+	select(-log2FC) %>%
+	spread(cell_line,log2FC_mod) %>%
+	column_to_rownames("Protein") %>% filter(complete.cases(.)) 
+
+
+# clustering
+
+ph_obj = hm_data_proteomics %>% 
+	pheatmap(labels_row = " ",
+			 cluster_rows = FALSE,
+			 color = colorRampPalette(rev(RColorBrewer::brewer.pal(n = 7, name="RdYlBu")))(100), 
+			 breaks = seq(-5,5,length.out = 99),
+			 cutree_cols = 8, silent = T) 
+
+col_annotation_proteomics = data.frame(protein_groups = as.factor(cutree(ph_obj$tree_col,k = 8)))
+```
+
+```{r,fig.width=10,fig.height=7}
+hm_data_proteomics %>% 
+	pheatmap(cluster_rows = F, 
+			 color = colorRampPalette(rev(RColorBrewer::brewer.pal(n = 7, name="RdYlBu")))(100), 
+			 breaks = seq(-5,5,length.out = 99),
+			 show_rownames = FALSE,
+			 cutree_cols = 8,
+			 annotation_col =col_annotation_proteomics )
+```
+
+## RNA dataset
+
+```{r}
+
+cell_lines <- rnaseq_raw$Cellline
+rnaseq_raw$Cellline <- NULL
+rnaseq_raw <- type_convert(rnaseq_raw, col_types = cols(.default = col_double()))
+rnaseq_raw <- bind_cols(data.frame(cell_lines=cell_lines), rnaseq_raw)
+rnaseq <- rnaseq_raw %>% gather("gene","value",-cell_lines) %>% as_tibble()
+
+hm_data_rna <- 
+	rnaseq %>% 
+	#filter(cell_lines %in% available_cellines) %>%
+	spread(cell_lines,value) %>%
+	column_to_rownames("gene") %>% filter(complete.cases(.)) 
+
+
+# clustering
+
+ph_obj = hm_data_rna %>% 
+	pheatmap(labels_row = " ",
+			 cluster_rows = F, 
+			 #color = colorRampPalette(rev(RColorBrewer::brewer.pal(n = 7, name="RdYlBu")))(100), 
+			 #breaks = seq(-5,5,length.out = 99),
+			 cutree_cols = 8,show_rownames = F,silent = T) 
+
+col_annotation_rna = data.frame(rna_groups = as.factor(cutree(ph_obj$tree_col,k = 8)))
+```
+
+```{r, fig.width=10,fig.height=7}
+hm_data_rna %>% 
+	pheatmap(cluster_rows = FALSE, 
+			 labels_row ="",
+			 show_rownames = FALSE,
+			 cutree_cols = 8,
+			 annotation_col = col_annotation_rna )
+```
+
+
+
+## Phospho with clustering annotations
+
+```{r}
+# heatmap data ----
+
+hm_data <- median_interpolated_data %>% 
+	filter(!reporter %in% c("p.PLCg2","p.HER2") ) %>%  #here we dont care about plcg2 and her2 so we leave them out to be able to cluster others
+	filter(treatment!="imTOR") %>%
+	mutate(row_description = paste(reporter, treatment,time,sep = "_")) %>%
+	ungroup()%>%
+	select(row_description,cell_line,value) %>%
+	spread(cell_line,value = value) %>%
+	column_to_rownames("row_description") 
+
+
+# annotation work ----
+
+col_annotation <- col_annotation_proteomics %>%
+	rownames_to_column("cell_line") %>% 
+	full_join(col_annotation_rna %>%rownames_to_column("cell_line"), by = "cell_line" ) %>%
+	mutate(global_groups_prot = protein_groups ) %>%
+	mutate(global_groups_rna = rna_groups) %>%
+	mutate(use = ifelse( cell_line %in%
+	{cell_line_usage %>% 
+			filter(test_cell_line == 1,training_cell_line==0) %>%
+			pull(cell_lines)  
+	},  "test", ifelse(cell_line %in% 
+	{cell_line_usage %>%
+			filter(training_cell_line==1) %>%
+			pull(cell_lines)
+	}, "training", "free"))) %>%
+	#mutate(global_groups_prot = ifelse(protein_groups %in% c(1,2,3,4,7,8),protein_groups,"-")) %>%
+	#mutate(global_groups_rna = ifelse(rna_groups %in% c(1,2,3,4,5,6,8),rna_groups,"-")) %>%
+	select(cell_line,global_groups_prot, global_groups_rna,use) %>%
+	
+	column_to_rownames("cell_line")
+	
+row_labeling = tibble(original_names = rownames(hm_data)) %>%
+	mutate(label = ifelse(grepl("_0",original_names),original_names,""))
+```
+
+```{r,fig.width=10,fig.height=12}
+# plotting -----
+hm_data %>% 
+	pheatmap(cluster_rows = F,
+			 color = colorRampPalette(brewer.pal(n = 7, name = "YlOrRd"))(100),
+			 annotation_col = col_annotation,
+			 clustering_distance_cols = "euclidean",
+			 labels_row = row_labeling$label,
+			 cutree_cols = 7) 
+```

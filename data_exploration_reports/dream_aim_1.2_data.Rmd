@@ -7,9 +7,7 @@ output: html_document
 
 ```{r include=FALSE}
 library(tidyverse)
-library(DBI)
-library(RSQLite)
-library(progress)
+library(pheatmap)
 ```
 
 ### Load the interpolated data
@@ -18,13 +16,12 @@ library(progress)
 median_interpolated_data <- read_rds("./data/median_data/interpolated_median_all_reporters_mine.rds")
 ```
 
-# AIM 1.2.1 Predict phospho in iPKC condition
-
+## AIM 1.2.1 Data for iPKC condition
 
 Cluster everything except mTOR and then only iPKC measurements. 
 
 
-```{r,fig.width=10,fig.height=7}
+```{r}
 hm_data_whole <- median_interpolated_data %>% 
 	filter(!reporter %in% c("p.PLCg2","p.HER2") ) %>%  #here we dont care about plcg2 and her2 so we leave them out to be able to cluster others
 	filter(treatment!="imTOR") %>%
@@ -39,20 +36,28 @@ row_labeling_whole = tibble(original_names = rownames(hm_data_whole)) %>%
 	mutate(label = ifelse(grepl("EGF_0",original_names),original_names,""))
 
 
-ph_obj = hm_data_whole %>% pheatmap(cluster_rows = F, clustering_distance_cols = "euclidean", labels_row = row_labeling_whole$label, cutree_cols = 9) 
-
-
+ph_obj = hm_data_whole %>% 
+	pheatmap(cluster_rows = F,
+			 clustering_distance_cols = "euclidean",
+			 labels_row = row_labeling_whole$label,
+			 cutree_cols = 9,
+			 silent = TRUE) 
 
 col_annotation_whole = data.frame(global_groups = as.factor(cutree(ph_obj$tree_col,k = 9)))
-
-ph_obj = hm_data_whole %>% pheatmap(cluster_rows = F, clustering_distance_cols = "euclidean", labels_row = row_labeling_whole$label, cutree_cols = 9,annotation_col =col_annotation_whole )
 ```
 
-clustering only condition of iPKC, 
+```{r, fig.width=10,fig.height=7}
+hm_data_whole %>% pheatmap(cluster_rows = F,
+						   clustering_distance_cols = "euclidean",
+						   labels_row = row_labeling_whole$label,
+						   cutree_cols = 9,
+						   annotation_col = col_annotation_whole )
+```
+
+### clustering iPKC phospho response
 
 ```{r,fig.width=12,fig.width=10}
 # heatmap data ----
-
 
 hm_data <- median_interpolated_data %>% 
 	filter(!reporter %in% c("p.PLCg2","p.HER2") ) %>%  #here we dont care about plcg2 and her2 so we leave them out to be able to cluster others
@@ -63,24 +68,31 @@ hm_data <- median_interpolated_data %>%
 	spread(cell_line,value = value) %>%
 	column_to_rownames("row_description") 
 
-
 # annotation work ----
-
-col_annotation <- col_annotation_whole%>% rownames_to_column("cell_line") %>% mutate(global_groups = ifelse(global_groups %in% c(1,2,3,4,6,7,8),global_groups,"-")) %>% column_to_rownames("cell_line")
-
+col_annotation <- col_annotation_whole %>%
+	rownames_to_column("cell_line") %>%
+	mutate(global_groups = ifelse(global_groups %in% c(1,2,3,4,6,7,8),global_groups,"-")) %>%
+	column_to_rownames("cell_line")
 
 
 row_labeling = tibble(original_names = rownames(hm_data)) %>%
 	mutate(label = ifelse(grepl("_0",original_names),original_names,""))
 
-# plotting -----
-library(pheatmap)
-
-hm_data %>% pheatmap(cluster_rows = F,annotation_col = col_annotation, clustering_distance_cols = "euclidean", labels_row = row_labeling$label, cutree_cols = 7) 
 ```
 
-# AIM 1.2.2 Predict phospho in imTOR condition
-```{r,fig.height=7,fig.width=10}
+```{r,fig.width=10,fig.height=7}
+# plotting -----
+
+hm_data %>% pheatmap(cluster_rows = F,
+					 annotation_col = col_annotation,
+					 clustering_distance_cols = "euclidean",
+					 labels_row = row_labeling$label,
+					 cutree_cols = 7) 
+```
+
+## AIM 1.2.2 imTOR condition prediction
+
+```{r}
 hm_data_whole <- median_interpolated_data %>% 
 	filter(!reporter %in% c("p.PLCg2","p.HER2") ) %>%  #here we dont care about plcg2 and her2 so we leave them out to be able to cluster others
 	filter(treatment=="imTOR") %>%
@@ -95,12 +107,20 @@ row_labeling_whole = tibble(original_names = rownames(hm_data_whole)) %>%
 	mutate(label = ifelse(grepl("_0",original_names),original_names,""))
 
 
-ph_obj = hm_data_whole %>% pheatmap(cluster_rows = F, clustering_distance_cols = "euclidean", labels_row = row_labeling_whole$label) 
-
-
+ph_obj = hm_data_whole %>% pheatmap(cluster_rows = F,
+									clustering_distance_cols = "euclidean",
+									labels_row = row_labeling_whole$label,
+									silent = T) 
 
 col_annotation_whole = data.frame(global_groups = as.factor(cutree(ph_obj$tree_col,k = 7)))
+```
 
-ph_obj = hm_data_whole %>% pheatmap(cluster_rows = F, clustering_distance_cols = "euclidean", labels_row = row_labeling_whole$label, cutree_cols = 7,annotation_col =col_annotation_whole )
+```{r,fig.height=7,fig.width=10}
+ph_obj = hm_data_whole %>%
+	pheatmap(cluster_rows = F,
+			 clustering_distance_cols = "euclidean",
+			 labels_row = row_labeling_whole$label,
+			 cutree_cols = 7,
+			 annotation_col =col_annotation_whole )
 ```
 
