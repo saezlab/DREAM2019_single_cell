@@ -36,51 +36,6 @@ proteomics <- proteomics_raw %>%
 
 ### Proteomics only ------------------------------------------------------------
 
-#### predict p-ERK at basal condition
-# predict  phosphosite in one timepoint across cell-lines. 
-
-model_data <- median_interpolated_data %>% 
-	filter(time==0,treatment=="EGF",reporter=="p.ERK") %>%
-	select(cell_line,value)
-	
-# inner_join: we 
-model_data <- model_data %>% inner_join(proteomics,by="cell_line")
-
-# Spliting training and testing dataset
-index = sample( 1:nrow( model_data ), nrow( model_data ) * 0.6, replace = FALSE ) 
-
-colnames(model_data) <- make.names(colnames(model_data))
-trainset = model_data[ index, ]
-test = model_data[ -index, ]
-testset = test %>% select( -value )
-
-
-
-n = names( trainset )
-f = as.formula( paste( "value ~", paste( n[!n %in% c("value")], collapse = "+" ) ) )
-
-library(ranger)
-library(glmnet)
-
-rg.res <- ranger(value ~ ., data = trainset, mtry = 5, max.depth = 6,verbose = T )
-glm.res = glmnet::glmnet(x = as.matrix(trainset[,c(-1,-2)]),y=trainset$value)
-
-rg.pred.training <- predict(rg.res, data = trainset)
-rg.pred.test <- predict(rg.res, data = testset)
-
-
-glm.pred.test <- predict(glm.res,newx = as.matrix(testset[,-1]),s = 0.101900)
-glm.pred.training <- predict(glm.res,newx = as.matrix(trainset[,c(-1,-2)]),s = 0.101900)
-
-
-plot(rg.res$predictions, trainset$value)
-points(rg.pred.test$predictions, test$value, col="red")
-
-plot(glm.pred.training, trainset$value)
-points(glm.pred.test, test$value, col="red")
-
-
-
 
 
 #### predict each phospho in each condition ----------------------------------
@@ -94,65 +49,20 @@ colnames(proteomics) <- make.names(colnames(proteomics))
 # Spliting training and testing dataset
 training_cellines = sample(cell_lines , length(cell_lines) * 0.8, replace = FALSE ) 
 # test: 
-# "BT20"     "BT474"    "CAL148"   "EFM19"    "EFM192A"  "HCC1937"  "HCC1954"  "HCC2157"  "MDAkb2"   "MDAMB361"
-# "MDAMB436" "MDAMB453" "OCUBM"   
+# test_cellines = c("BT20", "BT474", "CAL148", "EFM19", "EFM192A", "HCC1937", "HCC1954",
+#  "HCC2157", "MDAkb2", "MDAMB361", "MDAMB436", "MDAMB453", "OCUBM")   
 
-genes = colnames(proteomics)
-f = as.formula( paste( "value ~", paste( n[!n %in% c("cell_line")], collapse = "+" ) ) )
-
-
-bar <- progress::progress_bar$new(total = 2257)
-
-model_results <- median_interpolated_data %>% filter(!is.na(value)) %>%
-	mutate(data_purpose = ifelse(cell_line %in% training_cellines, "training","test")) %>%
-	group_by(treatment,time,reporter) %>% nest() %>% 
-	mutate(model = map(data,function(df,prot){
-		 #browser()
-		bar$tick()
-		df = df %>% inner_join(prot,by="cell_line")
-		
-		trainset <- df %>% filter(data_purpose == "training")
-		testset <- df %>% filter(data_purpose == "test")
-		
-		rg.res <- ranger(value ~ ., data = trainset[,c(-1,-3)], mtry = 5, max.depth = 6,verbose = T )
-		
-		testset <- testset %>% select(cell_line,value,data_purpose) %>% 
-			bind_cols(predicted_value = predictions(predict(rg.res, data = testset[,c(-1,-2,-3)])))
-		
-		trainset <- trainset %>% select(cell_line,value,data_purpose) %>% 
-			bind_cols(predicted_value = rg.res$predictions)
-		
-		
-		bind_rows(testset,trainset)
-		
-		
-	},prot=proteomics)) 
+# genes = colnames(proteomics)
+# f = as.formula( paste( "value ~", paste( n[!n %in% c("cell_line")], collapse = "+" ) ) )
 
 
-if(FALSE) saveRDS(model_results,"./prediction_reports/aim2_model_predictions.RDS")
+# model_v1: for each reporter we build a model condition-wise, independently
+source("prediction_reports/aim2_model_v1.R")
+model_v1_results = aim2_model_v1(median_interpolated_data,proteomics,training_cellines)
 
-model_results %>% unnest(model) %>% filter(data_purpose=="test") %>% 
-	filter(cell_line == "BT20") %>%
-	ggplot() + 
-	geom_line(aes(time,value,col=treatment)) +
-	geom_line(aes(time,predicted_value,col=treatment)) +facet_wrap(~reporter)
+if(FALSE) saveRDS(model_v1_results,"./prediction_reports/aim2_model_predictions.RDS")
 
-model_results %>% unnest(model) %>% filter(data_purpose=="test") %>% 
-	filter(cell_line == "BT20") %>%
-	ggplot() + 
-	geom_point(aes(value,predicted_value,col=treatment)) +
-	facet_wrap(~reporter)
-
-
-# reporter
-model_results %>% unnest(model) %>% 
-	 filter(reporter=="p.S6")%>%
-	ggplot() + 
-	geom_line(aes(time,value,col=treatment)) +
-	geom_line(aes(time,predicted_value,col=treatment),linetype=2) +facet_wrap(~cell_line)
-
-
-
+##### plot prediction results for model_v1 -------------------------------------
 pdf("./prediction_reports/aim2_predictions.pdf")
 sapply(cell_lines,function(cl){
 	#cl = "BT20"
@@ -204,8 +114,9 @@ sapply(cell_lines,function(cl){
 })
 dev.off()
 
-
-model_condition_stats <- model_results %>% unnest(model) %>% group_by(cell_line,treatment,reporter) %>%
+#### statistics of prediction results for model_v1 -----------------------------
+model_condition_stats <- model_results %>% unnest(model) %>% 
+	group_by(cell_line,treatment,reporter) %>%
 	summarise(
 		RMSE = sqrt(sum((value-predicted_value)^2)/n()),
 		R2 = 1- sum((value-predicted_value)^2) / sum((value-mean(value))^2),
@@ -218,7 +129,8 @@ model_global_stats <- model_results %>% unnest(model) %>% ungroup() %>%
 		data_sd = sd(value)
 	) 
 
-model_cell_line_stats <- model_results %>% unnest(model) %>% ungroup() %>% group_by(cell_line) %>%
+model_cell_line_stats <- model_results %>% unnest(model) %>% ungroup() %>% 
+	group_by(cell_line) %>%
 	summarise(
 		RMSE = sqrt(sum((value-predicted_value)^2)/n()),
 		R2 = 1- sum((value-predicted_value)^2) / sum((value-mean(value))^2),
@@ -231,6 +143,8 @@ model_reporter_stats <- model_results %>% unnest(model) %>% ungroup() %>% group_
 		R2 = 1- sum((value-predicted_value)^2) / sum((value-mean(value))^2),
 		data_sd = sd(value)
 	) 
+
+
 
 # reduce the dimensionality of the proteomics by selecting the proteins close to the reporters. 
 
