@@ -5,18 +5,18 @@ library(DBI)
 library(RSQLite)
 library(progress)
 
-
-
 target_folder = "./challenge_data"
 
 
-# utility functions ------------------------------------------------------------
-
-# end of utility functions -----------------------------------------------------
-
 ### Export single cell phospho data --------------------------------------------
 con <- dbConnect(RSQLite::SQLite(), "./data/cleaned_single_cell_data/single_cell_dream_cls.sqlite")
+median_data <- read_csv("./challenge_data/median_phospho/median_phospho_data.csv")	
+
+
 cell_lines <-  dbListTables(con)
+
+
+
 
 cell_line_sheet <- readxl::read_excel("./data/cell_line_distribution.xlsx",sheet = 1,range = "A1:I69")
 
@@ -30,6 +30,11 @@ for(current_cell_line in cell_lines){
 	
 	print(paste("reading ",current_cell_line))
 	
+	purpose = cell_line_sheet %>% filter(cell_line == current_cell_line)
+	purpose[1,as.logical(is.na(purpose[1,]))] = ""  # set NA to empty, to be used in logical evaluation
+	
+	
+	
 	# load cell_line 
 	sc_data = dbReadTable(con,  dbQuoteIdentifier(con,current_cell_line)) %>% 
 		as_tibble() 
@@ -38,10 +43,6 @@ for(current_cell_line in cell_lines){
 	
 	
 	# process according to the purpose of the cell-line. 
-	
-	purpose = cell_line_sheet %>% filter(cell_line == current_cell_line)
-	purpose[1,as.logical(is.na(purpose[1,]))] = ""
-	
 	public_data = sc_data
 	
 	
@@ -97,21 +98,8 @@ for(current_cell_line in cell_lines){
 				  path = file.path(target_folder,'predict_conditions',paste0("AIM_1_2_2_", current_cell_line,".csv")))
 		
 	}else if(purpose$AIM2 == "test"){
-		# 1. remove imTOR condition in the public_data from all cell-lines. 
-	
-		reporters = colnames(public_data)[-1:-5]
-		
-		predict_conditions = public_data %>% filter(treatment %in% c("EGF", "iEGFR", "iMEK", "iPI3K", "iPKC")) %>% 
-			select(-cellID,-fileID) %>%
-			group_by(cell_line,treatment,time) %>% mutate_at(reporters,~NA_real_) %>%unique() %>%
-			nest() %>% mutate(extended_data = map(data,function(data){
-				data.frame(cellID = 1:10000,data)	
-			})) %>% unnest(extended_data)
-		
-		# write out with 6 digit precision
-		write_csv(predict_conditions, 
-				  path = file.path(target_folder,'predict_conditions',paste0("AIM_2_", current_cell_line,".csv")))
-		
+		# nothing to do.
+		# this challenge is handled in export_dream_median_phospho.R
 	}
 }
 
