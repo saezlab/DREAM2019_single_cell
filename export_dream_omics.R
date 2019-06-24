@@ -16,14 +16,11 @@ rnaseq_raw <- readRDS("./data/genomics/dat_RNAseq_Marcotte.rds") %>% as_tibble()
 rnaseq <-rnaseq_raw %>% select(Cellline,everything())
  
 
-write_csv(rnaseq,path = "./challenge_data/transcriptomics/rnaseq.csv")	
+write_csv(rnaseq,path = "./challenge_data/transcriptomics_genomics/rnaseq.csv")	
 
 
 
 ### Transcriptomics ====
 cnv_raw <- readRDS("./data/genomics/CNV_MARCOTTE.rds") %>% as_tibble()
 
-
-
-
-write_csv(cnv_raw,path = "./challenge_data/transcriptomics/CNV_MARCOTTE.csv")	
+write_csv(cnv_raw,path = "./challenge_data/transcriptomics_genomics/CNV_MARCOTTE.csv")	
