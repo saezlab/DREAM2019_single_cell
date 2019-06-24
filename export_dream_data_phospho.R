@@ -4,19 +4,18 @@
 # read in single cell data per cell-lines from SQL, then process and then export to csv file
 #
 # we create a public_data --> for training
-# we create a validation_data --> that we need to score 
+# we create a validation_data --> that we need to score the predictions
+#
+# we also export csv files, that indicate the values to be predicted by the participants.
+# this is handled in export_prediction_conditions.R
 
 library(tidyverse)
 library(DBI)
 library(RSQLite)
 library(progress)
 
-
-
 target_folder = "./challenge_data"
 log_file = file("challenge_data/log.txt",open = "a")
-
-
 
 # utility functions ------------------------------------------------------------
 
@@ -120,19 +119,14 @@ for(current_cell_line in cell_lines){
 		
 		public_data = public_data %>% filter(treatment=="full")
 		
-		cat("select EGF, iEGFR, iMEK, iPI3K, iPKC for validation data \n",file = log_file)
-		
-		validation_data = validation_data %>% filter(treatment %in% c("EGF", "iEGFR", "iMEK", "iPI3K", "iPKC"))
-		
-		cat("writing public and validation datasets \n",file = log_file)
+		cat("writing public datasets \n",file = log_file)
 		
 		# write out with 6 digit precision
 		write_csv(public_data %>% mutate_if(is.double,format,digits=6), 
 				  path = file.path(target_folder,'single_cell_phospho',paste0(current_cell_line,".csv")))
 		
-		# write out with 6 digit precision
-		write_csv(validation_data %>% mutate_if(is.double,format,digits=6), 
-				  path = file.path(target_folder,'validation_data',paste0("AIM_2_",current_cell_line,".csv")))
+		# nothing to do with validation data
+		# this challenge is handled in export_dream_median_phospho.R
 		
 	}else {
 		cat("training data \n",file = log_file)
