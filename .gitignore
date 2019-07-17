@@ -1,6 +1,6 @@
 
 # data and alrge files:
-data/
+
 *.key
 *.Rproj
 figures/*.pdf
