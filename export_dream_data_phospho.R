@@ -34,13 +34,18 @@ cell_lines <-  dbListTables(con)
 
 cell_lines  <- cell_lines[cell_lines != "HCC70_2"]  # remove the duplicated
 
-cell_line_sheet <- readxl::read_excel("./data/cell_line_distribution.xlsx",sheet = 1,range = "A1:I69")
+cell_line_sheet <- readxl::read_excel("./data/cell_line_distribution.xlsx",sheet = 1,range = "A1:J69")
+
+## Just for rerunning for aim 1.2.2 -- dont use
+# cell_lines  = cell_line_sheet %>% filter(AIM_1_2_2 == "test") %>% pull(cell_line)
+### end temp
+
 
 bar = progress::progress_bar$new(format = "  Processing [:bar] :percent eta: :eta",
 								 total = length(cell_lines))
-
-current_cell_line = cell_lines[[1]]
-current_cell_line = cell_lines[[22]]
+# test examples:
+#current_cell_line = cell_lines[[1]]
+#current_cell_line = cell_lines[[22]]
 
 for(current_cell_line in cell_lines){	
 	bar$tick()
@@ -183,23 +188,26 @@ dbDisconnect(con)
 # previously we exported the validation per cell-line, now we import them and aggregate.
 
 # AIM 1.1
-prediction_data = list.files(file.path(target_folder,"validation_data"),pattern = "AIM_11_",full.names = T) %>% 
+temp_files =  list.files(file.path(target_folder,"validation_data"),pattern = "AIM_11_",full.names = T)
+prediction_data = temp_files %>% 
 	map(read_csv) %>% bind_rows()
 
 write_csv(prediction_data,"./challenge_data/validation_data/AIM_11_data.csv")
 
 
 # AIM 1.2.1
-prediction_data = list.files(file.path(target_folder,"validation_data"),pattern = "AIM_121_",full.names = T) %>% 
+temp_files =   list.files(file.path(target_folder,"validation_data"),pattern = "AIM_121_",full.names = T)
+prediction_data = temp_files  %>% 
 	map(read_csv) %>% bind_rows()
 
 write_csv(prediction_data,"./challenge_data/validation_data/AIM_121_data.csv")
 
 
 # AIM 1.2.2
-prediction_data = list.files(file.path(target_folder,"validation_data"),pattern = "AIM_122_",full.names = T) %>% 
+temp_files =  list.files(file.path(target_folder,"validation_data"),pattern = "AIM_122_",full.names = T)
+prediction_data = temp_files %>% 
 	map(read_csv) %>% bind_rows()
-
+prediction_data <- prediction_data %>% select(-p.HER2,-p.PLCg2)
 write_csv(prediction_data,"./challenge_data/validation_data/AIM_122_data.csv")
 
-
+file.remove(temp_files )
