@@ -1,15 +1,18 @@
 require(tidyverse)
 
 # scores the subchallenge aim 1.1
-# loads validation data
-# checks input for missing columns
-# check input for missing conditions (missing predicted cells)
-# compute root-measn square error by conditions, then averages these
-score_aim_1_1 <- function(prediction_data){
+#' @param prediction_data_file path to prediction data file (.csv)
+#' @param validation_data_file path to validation data file (.csv)
+#' @description checks input for missing columns
+#' check input for missing conditions (missing predicted cells)
+#' computes root-mean square error by conditions, then averages these
+
+score_aim_1_1 <- function(prediction_data_file,validation_data_file){
 	
 	# load validation data
-	validaton_files = list.files("./challenge_data/validation_data/",pattern = "AIM_11",full.names = T)	
-	validation_data <- validaton_files %>% map(read_csv) %>% bind_rows()
+	
+	validation_data <- read_csv(validation_data_file)
+	prediction_data <- read_csv(prediction_data_file)
 	
 	### Checking inputs -------------------
 	# checking columns of input data table
@@ -46,17 +49,3 @@ score_aim_1_1 <- function(prediction_data){
 }
 
 
-
-submitted_file = "./dry_run/aim1_predictions.csv"
-
-prediction_data = read_csv(submitted_file)
-
-
-## tests ----
-
-# predict with true data
-
-test_data <-list.files("./challenge_data/validation_data/",pattern = "AIM_11",full.names = T)	 %>% map(read_csv) %>% bind_rows()
-RMSE_test1 = score_aim_1_1(prediction_data = test_data)
-
-## continue of needed. 

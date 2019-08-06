@@ -5,6 +5,7 @@
 require(tidyverse)
 
 # this function computes the mean and covariance matrices from the single cell data
+# returns the matrices in long format
 data_to_stats <- function(single_cell_data){
 	# first we compute the mean and the covariance of the reporters
 	single_cell_stats <-  single_cell_data %>% 
@@ -43,13 +44,19 @@ data_to_stats <- function(single_cell_data){
 
 
 
+# scores the subchallenge aim 1.2.1 and 1.2.2
+#' @param prediction_data_file path to prediction data file (.csv)
+#' @param validation_data_file path to validation data file (.csv)
+#' @description checks input for missing columns
+#' check input for missing conditions (missing predicted cells)
+#' computes root-mean square error by conditions, then averages these
 
-# scores the subchallenge aim 1.2.1
-score_aim_1_2_1 <- function(prediction_data){
+
+score_aim_1_2 <- function(prediction_data_file,validation_data_file){
 	
 	# load validation data
-	validaton_files = list.files("./challenge_data/validation_data/",pattern = "AIM_121",full.names = T)	
-	validation_data <- validaton_files %>% map(read_csv) %>% bind_rows() %>% select(-fileID,-cellID)
+	validation_data <- read_csv (validation_data_file) %>% select(-fileID,-cellID)
+	prediction_data <- read_csv(prediction_data_file)
 	
 	### Checking inputs -------------------
 	# checking columns of input data table
@@ -87,7 +94,7 @@ score_aim_1_2_1 <- function(prediction_data){
 	prediction_stats <- data_to_stats(prediction_data) %>% rename(predicted_stat_value = stat_value)
 	
 	### Formating -------------------------
-	# convert to long format
+	# join the test and validation data
 	
 	combined_data = validation_stats %>%
 		full_join(prediction_stats, by=c("cell_line", "treatment", "time",  "stat_variable"))
@@ -97,15 +104,6 @@ score_aim_1_2_1 <- function(prediction_data){
 	final_score = dist(rbind(test = combined_data$test_stat_value,
 							 prediction =combined_data$predicted_stat_value), method = "euclidean")
 }
-
-
-
-submitted_file = "./dry_run/aim1_2_1_predictions.csv"
-
-prediction_data = read_csv(submitted_file)
-
-
-## tests ----
 
 
 
