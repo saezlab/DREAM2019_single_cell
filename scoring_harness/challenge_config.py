@@ -5,8 +5,29 @@
 # -----------------------------------------------------------------------------
 # Use rpy2 if you have R scoring functions
 import rpy2.robjects as robjects
+import rpy2.robjects.packages as rpackages
+from rpy2.robjects.vectors import StrVector
 import os
+# setup the R environment with tidyverse package: 
+package_names = ("dplyr", "tidyr","readr")
+if all(rpackages.isinstalled(x) for x in package_names):
+	have_package = True
+else:
+	have_package = False
+	
+if not have_package:
+	utils = rpackages.importr('utils')
+	utils.chooseCRANmirror(ind=1)
+	packagenames_to_install = [x for x in package_names if not rpackages.isinstalled(x)]
+	if len(packagenames_to_install) > 0:
+		utils.install_packages(StrVector(packagenames_to_install))
+	
+
+
+
+
 # scoring scripts:
+__file__ = os.path.join(os.getcwd(),"challenge_config.py")
 score1_path = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     '../scoring_scripts', 'score_aim_1_1.R')

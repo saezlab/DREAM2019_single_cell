@@ -1,8 +1,8 @@
 
 # How about MI instead of covariance ?
 # how about weighting stats stronger if it is further from zero?
-
-require(tidyverse)
+library(dplyr)
+library(tidyr)
 
 # this function computes the mean and covariance matrices from the single cell data
 # returns the matrices in long format

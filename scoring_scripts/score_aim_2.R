@@ -2,7 +2,10 @@
 # How about MI instead of covariance ?
 # how about weighting stats stronger if it is further from zero?
 
-require(tidyverse)
+#require(tidyverse)
+library(dplyr)
+library(tidyr)
+
 
 # scores the subchallenge aim 2
 #' @param prediction_data_file path to prediction data file (.csv)

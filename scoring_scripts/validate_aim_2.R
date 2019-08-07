@@ -12,7 +12,9 @@ require(tidyverse)
 #' computes root-mean square error by conditions, then averages these
 
 
-score_aim_2 <- function(prediction_data_file,validation_data_file){
+validate_aim_2 <- function(prediction_data_file,validation_data_file){
+	# to be returned:
+	error_status = list(state=0,message="")
 	
 	# load validation data
 	validation_data <- read_csv (validation_data_file) 
@@ -51,20 +53,7 @@ score_aim_2 <- function(prediction_data_file,validation_data_file){
 	} 
 	
 	
-	### Formating -------------------------
-	# join the test and validation data
-	
-	combined_data = full_join(prediction_data %>% gather(marker,prediction,-cell_line, -treatment, -time ),
-							  validation_data %>% gather(marker,test,-cell_line, -treatment, -time ),
-							  by=c("cell_line", "treatment", "time","marker"))
-	
-	### Calculate score --------------------
-	# calculate the  distance over all stats
-	RMSE_cond = combined_data %>% group_by(cell_line,treatment,marker) %>% 
-		summarise(RMSE = sqrt(sum((test - prediction)^2)/n())) 
-	
-
-	final_score = mean(RMSE_cond$RMSE)
+	return(error_status)
 }
 
 
