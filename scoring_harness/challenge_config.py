@@ -6,17 +6,56 @@
 # Use rpy2 if you have R scoring functions
 import rpy2.robjects as robjects
 import os
+# scoring scripts:
 score1_path = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     '../scoring_scripts', 'score_aim_1_1.R')
-score1_2_path = os.path.join(
+score1_2_1_path = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     '../scoring_scripts', 'score_aim_1_2_1.R')
+score1_2_2_path = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '../scoring_scripts', 'score_aim_1_2_2.R')
+score2_path = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '../scoring_scripts', 'score_aim_2.R')
+    
 robjects.r("source('{}')".format(score1_path))
-robjects.r("source('{}')".format(score1_2_path))
+robjects.r("source('{}')".format(score1_2_1_path))
+robjects.r("source('{}')".format(score1_2_2_path))
+robjects.r("source('{}')".format(score2_path))
 
-score_aim_1_2_1 = robjects.r('score_aim_1_2_1')
 score_aim_1_1 = robjects.r('score_aim_1_1')
+score_aim_1_2_1 = robjects.r('score_aim_1_2_1')
+score_aim_1_2_2 = robjects.r('score_aim_1_2_2')
+score_aim_2 = robjects.r('score_aim_2')
+
+# validation scripts in R
+
+validate1_path = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '../scoring_scripts', 'validate_aim_1_1.R')
+validate1_2_1_path = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '../scoring_scripts', 'validate_aim_1_2_1.R')
+validate1_2_2_path = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '../scoring_scripts', 'validate_aim_1_2_2.R')
+validate2_path = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '../scoring_scripts', 'validate_aim_2.R')
+    
+robjects.r("source('{}')".format(validate1_path))
+robjects.r("source('{}')".format(validate1_2_1_path))
+robjects.r("source('{}')".format(validate1_2_2_path))
+robjects.r("source('{}')".format(validate2_path))
+
+validate_aim_1_1 = robjects.r('validate_aim_1_1')
+validate_aim_1_2_1 = robjects.r('validate_aim_1_2_1')
+validate_aim_1_2_2 = robjects.r('validate_aim_1_2_2')
+validate_aim_2 = robjects.r('validate_aim_2')
+
+
 
 # Configuring them here as a list will save a round-trip to the server
 # every time the script starts and you can link the challenge queues to
