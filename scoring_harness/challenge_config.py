@@ -48,10 +48,6 @@ score_sc3 = robjects.r('score_sc3')
 score_sc4 = robjects.r('score_sc4')
 
 # validation scripts in R
-validate_test_path = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    '../scoring_scripts', 'test_validation.R')
-
 validate1_path = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     '../scoring_scripts', 'validate_sc1.R')
@@ -65,13 +61,11 @@ validate4_path = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     '../scoring_scripts', 'validate_sc4.R')
 
-robjects.r("source('{}')".format(validate_test_path))
 robjects.r("source('{}')".format(validate1_path))
 robjects.r("source('{}')".format(validate2_path))
 robjects.r("source('{}')".format(validate3_path))
 robjects.r("source('{}')".format(validate4_path))
 
-validate_test = robjects.r('test_validation')
 validate_sc1 = robjects.r('validate_sc1')
 validate_sc2 = robjects.r('validate_sc2')
 validate_sc3 = robjects.r('validate_sc3')
