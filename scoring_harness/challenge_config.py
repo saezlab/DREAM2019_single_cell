@@ -5,22 +5,22 @@
 # -----------------------------------------------------------------------------
 # Use rpy2 if you have R scoring functions
 import rpy2.robjects as robjects
-import rpy2.robjects.packages as rpackages
-from rpy2.robjects.vectors import StrVector
+# import rpy2.robjects.packages as rpackages
+# from rpy2.robjects.vectors import StrVector
 import os
-# setup the R environment with tidyverse package:
-package_names = ("dplyr", "tidyr", "readr")
-if all(rpackages.isinstalled(x) for x in package_names):
-    have_package = True
-else:
-    have_package = False
+# # setup the R environment with tidyverse package:
+# package_names = ("dplyr", "tidyr", "readr")
+# if all(rpackages.isinstalled(x) for x in package_names):
+#     have_package = True
+# else:
+#     have_package = False
 
-if not have_package:
-    utils = rpackages.importr('utils')
-    utils.chooseCRANmirror(ind=1)
-    packagenames_to_install = [x for x in package_names if not rpackages.isinstalled(x)]
-    if len(packagenames_to_install) > 0:
-        utils.install_packages(StrVector(packagenames_to_install))
+# if not have_package:
+#     utils = rpackages.importr('utils')
+#     utils.chooseCRANmirror(ind=1)
+#     packagenames_to_install = [x for x in package_names if not rpackages.isinstalled(x)]
+#     if len(packagenames_to_install) > 0:
+#         utils.install_packages(StrVector(packagenames_to_install))
 
 # scoring scripts:
 # __file__ = os.path.join(os.getcwd(), "challenge_config.py")
@@ -347,10 +347,10 @@ EVALUATION_QUEUES_CONFIG = [
         'goldstandard_path': 'path/to/sc1gold.txt'
     },
     {
-       'id': 9614298,
-       'scoring_func': score2,
-       'validation_func': validate_py_sc2,
-       'goldstandard_path': 'path/to/sc2gold.txt'
+        'id': 9614298,
+        'scoring_func': score2,
+        'validation_func': validate_py_sc2,
+        'goldstandard_path': 'path/to/sc2gold.txt'
     },
     {
         'id': 9614302,
@@ -359,9 +359,9 @@ EVALUATION_QUEUES_CONFIG = [
         'goldstandard_path': 'path/to/sc3gold.txt'
     },
     {
-       'id': 9614303,
-       'scoring_func': score4,
-       'validation_func': validate_py_sc4,
-       'goldstandard_path': 'path/to/sc4gold.txt'
+        'id': 9614303,
+        'scoring_func': score4,
+        'validation_func': validate_py_sc4,
+        'goldstandard_path': 'path/to/sc4gold.txt'
     }
 ]
