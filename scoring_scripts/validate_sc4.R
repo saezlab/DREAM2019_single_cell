@@ -10,7 +10,6 @@ library(readr)
 #' checking:
 #'  - missing columns
 #'  - missing conditions
-#'  - number of cells per conditions
 #'  - NAs in the prediction
 #'  @return error_status list(), with fields state and message. 
 #'  state = 0 if validation was successful
@@ -36,24 +35,40 @@ validate_sc4 <- function(prediction_data_file,validation_data_file){
 						  'p.STAT3', 'p.STAT5') 
 	
 	if(!all(required_columns %in% names(prediction_data))) {
-		stop(paste0("missing columns detected. Required columns: ", paste(required_columns,collapse = ", ")))
+		error_status$state = -1
+		error_status$message = paste0("missing columns detected. Required columns: ", paste(required_columns,collapse = ", "))
 	}
+	
 	prediction_data = prediction_data %>% select(required_columns)
 	# as we agreed, we remove plcg and her2 from the validation data:
 	validation_data = validation_data %>% select(required_columns)
 	
 	# checking for any missing conditions
 	required_conditions <- validation_data %>% select(cell_line,treatment,time) %>% unique()
-	predicted_conditions <- prediction_data %>% select(cell_line,treatment,time)
+	predicted_conditions <- prediction_data %>% select(cell_line,treatment,time)  %>% unique()
 	
 	missing_conditions = anti_join(required_conditions,predicted_conditions,by = c("cell_line", "treatment", "time"))
 	
 	if(nrow(missing_conditions)>0){
-		print("table showing the conditions missing from the submitted predictions:")
-		print(missing_conditions %>% select(c("cell_line", "treatment", "time")))
-		stop("missing predictions detected for above conditions")	
+		error_status$state = -2
+		error_status$message = 
+			paste0("missing predictions detected for the following conditions (cell_line_treatment_time): ",
+				   missing_conditions %>%
+				   	unite(condition_id) %>%
+				   	pull(condition_id) %>%
+				   	paste(.,collapse = ", ")
+			)
+		return(error_status)
 	} 
 	
+	# checking for NAs
+	contains_NA_prediction <- prediction_data %>%  is.na() %>% any()
+	if(contains_NA_prediction){
+		error_status$state = -3
+		error_status$message = paste0("NA value detected in the predictions.")
+		return(error_status)
+		
+	}
 	
 	return(error_status)
 }

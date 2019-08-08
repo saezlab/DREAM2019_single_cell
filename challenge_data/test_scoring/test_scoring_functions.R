@@ -60,7 +60,7 @@ source("./scoring_scripts/validate_sc4.R")
 test_aim2_file  = "./challenge_data/test_scoring/test_data/aim_2_test_data.csv"
 validation_file_aim2 = "./challenge_data/validation_data/AIM_2_median_data.csv"
 
-sc4_validation = score_sc4(prediction_data_file = test_aim2_file,
+sc4_validation = validate_sc4(prediction_data_file = test_aim2_file,
 					   validation_data_file = validation_file_aim2)
 
 sc4_score = score_sc4(prediction_data_file = test_aim2_file,
