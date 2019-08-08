@@ -11,7 +11,7 @@ library(dplyr)
 
 validate_aim_1_1 <- function(prediction_data_file, validation_data_file) {
 
-  # to be returned:
+  # stores the error message and state
   error_status = list(state=0,message="")
 	
   # load validation data

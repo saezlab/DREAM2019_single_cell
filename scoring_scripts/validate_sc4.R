@@ -1,11 +1,11 @@
 
 # How about MI instead of covariance ?
 # how about weighting stats stronger if it is further from zero?
+library(dplyr)
+library(tidyr)
+library(readr)
 
-require(tidyverse)
-
-
-# scores the subchallenge aim 1.2.1 and 1.2.2
+# scores the subchallenge aim 2
 #' @param prediction_data_file path to prediction data file (.csv)
 #' @param validation_data_file path to validation data file (.csv)
 #' @description checks input for missing columns
@@ -13,13 +13,12 @@ require(tidyverse)
 #' computes root-mean square error by conditions, then averages these
 
 
-validate_aim_1_2 <- function(prediction_data_file,validation_data_file){
-	
+validate_aim_2 <- function(prediction_data_file,validation_data_file){
 	# to be returned:
 	error_status = list(state=0,message="")
 	
 	# load validation data
-	validation_data <- read_csv (validation_data_file) %>% select(-fileID,-cellID)
+	validation_data <- read_csv (validation_data_file) 
 	prediction_data <- read_csv(prediction_data_file)
 	
 	### Checking inputs -------------------
@@ -49,11 +48,13 @@ validate_aim_1_2 <- function(prediction_data_file,validation_data_file){
 	missing_conditions = anti_join(required_conditions,predicted_conditions,by = c("cell_line", "treatment", "time"))
 	
 	if(nrow(missing_conditions)>0){
+		print("table showing the conditions missing from the submitted predictions:")
 		print(missing_conditions %>% select(c("cell_line", "treatment", "time")))
 		stop("missing predictions detected for above conditions")	
 	} 
 	
-  return(error_status)
+	
+	return(error_status)
 }
 
 

@@ -2,12 +2,11 @@
 # How about MI instead of covariance ?
 # how about weighting stats stronger if it is further from zero?
 
-#require(tidyverse)
 library(dplyr)
 library(tidyr)
+library(readr)
 
-
-# scores the subchallenge aim 2
+# scores the subchallenge aim 1.2.1 and 1.2.2
 #' @param prediction_data_file path to prediction data file (.csv)
 #' @param validation_data_file path to validation data file (.csv)
 #' @description checks input for missing columns
@@ -15,10 +14,12 @@ library(tidyr)
 #' computes root-mean square error by conditions, then averages these
 
 
-score_aim_2 <- function(prediction_data_file,validation_data_file){
+validate_aim_1_2_2 <- function(prediction_data_file,validation_data_file){
+	# to be returned:
+	error_status = list(state=0,message="")
 	
 	# load validation data
-	validation_data <- read_csv (validation_data_file) 
+	validation_data <- read_csv (validation_data_file) %>% select(-fileID,-cellID)
 	prediction_data <- read_csv(prediction_data_file)
 	
 	### Checking inputs -------------------
@@ -48,26 +49,10 @@ score_aim_2 <- function(prediction_data_file,validation_data_file){
 	missing_conditions = anti_join(required_conditions,predicted_conditions,by = c("cell_line", "treatment", "time"))
 	
 	if(nrow(missing_conditions)>0){
-		print("table showing the conditions missing from the submitted predictions:")
 		print(missing_conditions %>% select(c("cell_line", "treatment", "time")))
 		stop("missing predictions detected for above conditions")	
 	} 
-	
-	
-	### Formating -------------------------
-	# join the test and validation data
-	
-	combined_data = full_join(prediction_data %>% gather(marker,prediction,-cell_line, -treatment, -time ),
-							  validation_data %>% gather(marker,test,-cell_line, -treatment, -time ),
-							  by=c("cell_line", "treatment", "time","marker"))
-	
-	### Calculate score --------------------
-	# calculate the  distance over all stats
-	RMSE_cond = combined_data %>% group_by(cell_line,treatment,marker) %>% 
-		summarise(RMSE = sqrt(sum((test - prediction)^2)/n())) 
-	
-
-	final_score = mean(RMSE_cond$RMSE)
+	return(error_status)
 }
 
 

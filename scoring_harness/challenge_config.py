@@ -112,6 +112,35 @@ def validate_func(submission_path, goldstandard_path):
     message = "Passed Validation"
     return(is_valid, message)
 
+def validate_func_aim_1_1(submission_path, goldstandard_path):
+    '''
+    Validate submission for aim 1.1
+
+    MUST USE ASSERTION ERRORS!!!
+
+    eg.
+    >>> assert os.path.basename(submission_path) == "prediction.tsv", \
+    >>> "Submission file must be named prediction.tsv"
+    or raise AssertionError()...
+    Only assertion errors will be returned to participants,
+    all other errors will be returned to the admin
+
+    Args:
+        submission_path:  Path to submission file
+        goldstandard_path: Path to truth file
+
+    Returns:
+        Must return a boolean and validation message
+    '''
+    from synapseclient import Submission
+    # Sometimes participants accidentally submit Projects/Folders
+    assert not isinstance(submission_path, Submission), \
+        "Submission must be a Synapse File and not Project/Folder"
+    is_valid = True
+    message = "Passed Validation"
+    return(is_valid, message)
+
+
 
 def validate_writeup(submission, goldstandard_path, syn,
                      public=True, admin=None):
@@ -202,13 +231,25 @@ EVALUATION_QUEUES_CONFIG = [
     {
         'id': 9614297,
         'scoring_func': score1,
-        'validation_func': validate_func,
+        'validation_func': validate_func1,
         'goldstandard_path': 'path/to/sc1gold.txt'
     },
     {
        'id': 9614298,
        'scoring_func': score2,
-       'validation_func': validate_func,
+       'validation_func': validate_func2,
+       'goldstandard_path': 'path/to/sc2gold.txt'
+    },
+    {
+        'id': 9614299,
+        'scoring_func': score3,
+        'validation_func': validate_func3,
+        'goldstandard_path': 'path/to/sc1gold.txt'
+    },
+    {
+       'id': 9614300,
+       'scoring_func': score4,
+       'validation_func': validate_func4,
        'goldstandard_path': 'path/to/sc2gold.txt'
     }
 ]

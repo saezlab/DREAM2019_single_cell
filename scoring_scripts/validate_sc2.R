@@ -4,10 +4,7 @@
 
 library(dplyr)
 library(tidyr)
-
-
-
-
+library(readr)
 
 # scores the subchallenge aim 1.2.1 and 1.2.2
 #' @param prediction_data_file path to prediction data file (.csv)
@@ -17,7 +14,8 @@ library(tidyr)
 #' computes root-mean square error by conditions, then averages these
 
 
-validate_aim_1_2 <- function(prediction_data_file,validation_data_file){
+validate_aim_1_2_1 <- function(prediction_data_file,validation_data_file){
+	
 	# to be returned:
 	error_status = list(state=0,message="")
 	
@@ -55,7 +53,8 @@ validate_aim_1_2 <- function(prediction_data_file,validation_data_file){
 		print(missing_conditions %>% select(c("cell_line", "treatment", "time")))
 		stop("missing predictions detected for above conditions")	
 	} 
-	return(error_status)
+	
+  return(error_status)
 }
 
 

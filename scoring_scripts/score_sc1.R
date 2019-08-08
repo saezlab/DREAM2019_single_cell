@@ -1,16 +1,16 @@
 
 library(dplyr)
 library(tidyr)
+library(readr)
 
-
-# scores the subchallenge aim 1.1
+# scores the subchallenge I
 #' @param prediction_data_file path to prediction data file (.csv)
 #' @param validation_data_file path to validation data file (.csv)
 #' @description checks input for missing columns
 #' check input for missing conditions (missing predicted cells)
 #' computes root-mean square error by conditions, then averages these
 
-score_aim_1_1 <- function(prediction_data_file, validation_data_file) {
+score_sc1 <- function(prediction_data_file, validation_data_file) {
 
   # load validation data
 

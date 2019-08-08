@@ -1,8 +1,11 @@
 
 # How about MI instead of covariance ?
 # how about weighting stats stronger if it is further from zero?
+
 library(dplyr)
 library(tidyr)
+library(readr)
+
 
 # this function computes the mean and covariance matrices from the single cell data
 # returns the matrices in long format
@@ -52,7 +55,7 @@ data_to_stats <- function(single_cell_data){
 #' computes root-mean square error by conditions, then averages these
 
 
-score_aim_1_2 <- function(prediction_data_file,validation_data_file){
+score_aim_1_2_1 <- function(prediction_data_file,validation_data_file){
 	
 	# load validation data
 	validation_data <- read_csv (validation_data_file) %>% select(-fileID,-cellID)
