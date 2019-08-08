@@ -1,19 +1,20 @@
 
-# How about MI instead of covariance ?
-# how about weighting stats stronger if it is further from zero?
 library(dplyr)
 library(tidyr)
 library(readr)
 
-# scores the subchallenge aim 2
+#' validate_sc4
 #' @param prediction_data_file path to prediction data file (.csv)
 #' @param validation_data_file path to validation data file (.csv)
-#' @description checks input for missing columns
-#' check input for missing conditions (missing predicted cells)
-#' computes root-mean square error by conditions, then averages these
-
-
-validate_aim_2 <- function(prediction_data_file,validation_data_file){
+#' @description  validates the predictions for subchallenge 4
+#' checking:
+#'  - missing columns
+#'  - missing conditions
+#'  - number of cells per conditions
+#'  - NAs in the prediction
+#'  @return error_status list(), with fields state and message. 
+#'  state = 0 if validation was successful
+validate_sc4 <- function(prediction_data_file,validation_data_file){
 	# to be returned:
 	error_status = list(state=0,message="")
 	

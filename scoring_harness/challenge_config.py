@@ -30,51 +30,56 @@ if not have_package:
 __file__ = os.path.join(os.getcwd(),"challenge_config.py")
 score1_path = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
-    '../scoring_scripts', 'score_aim_1_1.R')
-score1_2_1_path = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    '../scoring_scripts', 'score_aim_1_2_1.R')
-score1_2_2_path = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    '../scoring_scripts', 'score_aim_1_2_2.R')
+    '../scoring_scripts', 'score_sc1.R')
 score2_path = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
-    '../scoring_scripts', 'score_aim_2.R')
+    '../scoring_scripts', 'score_sc2.R')
+score3_path = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '../scoring_scripts', 'score_sc3.R')
+score4_path = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '../scoring_scripts', 'score_sc4.R')
     
 robjects.r("source('{}')".format(score1_path))
-robjects.r("source('{}')".format(score1_2_1_path))
-robjects.r("source('{}')".format(score1_2_2_path))
 robjects.r("source('{}')".format(score2_path))
+robjects.r("source('{}')".format(score3_path))
+robjects.r("source('{}')".format(score4_path))
 
-score_aim_1_1 = robjects.r('score_aim_1_1')
-score_aim_1_2_1 = robjects.r('score_aim_1_2_1')
-score_aim_1_2_2 = robjects.r('score_aim_1_2_2')
-score_aim_2 = robjects.r('score_aim_2')
+score_sc1 = robjects.r('score_sc1')
+score_sc2 = robjects.r('score_sc2')
+score_sc3 = robjects.r('score_sc3')
+score_sc4 = robjects.r('score_sc4')
 
 # validation scripts in R
-
+validate_test_path = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '../scoring_scripts', 'test_validation.R')
+    
 validate1_path = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
-    '../scoring_scripts', 'validate_aim_1_1.R')
-validate1_2_1_path = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    '../scoring_scripts', 'validate_aim_1_2_1.R')
-validate1_2_2_path = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    '../scoring_scripts', 'validate_aim_1_2_2.R')
+    '../scoring_scripts', 'validate_sc1.R')
 validate2_path = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
-    '../scoring_scripts', 'validate_aim_2.R')
-    
-robjects.r("source('{}')".format(validate1_path))
-robjects.r("source('{}')".format(validate1_2_1_path))
-robjects.r("source('{}')".format(validate1_2_2_path))
-robjects.r("source('{}')".format(validate2_path))
+    '../scoring_scripts', 'validate_sc2.R')
+validate3_path = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '../scoring_scripts', 'validate_sc3.R')
+validate4_path = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '../scoring_scripts', 'validate_sc4.R')
 
-validate_aim_1_1 = robjects.r('validate_aim_1_1')
-validate_aim_1_2_1 = robjects.r('validate_aim_1_2_1')
-validate_aim_1_2_2 = robjects.r('validate_aim_1_2_2')
-validate_aim_2 = robjects.r('validate_aim_2')
+robjects.r("source('{}')".format(validate_test_path))    
+robjects.r("source('{}')".format(validate1_path))
+robjects.r("source('{}')".format(validate2_path))
+robjects.r("source('{}')".format(validate3_path))
+robjects.r("source('{}')".format(validate4_path))
+
+validate_test = robjects.r('test_validation')
+validate_sc1 = robjects.r('validate_sc1')
+validate_sc2 = robjects.r('validate_sc2')
+validate_sc3 = robjects.r('validate_sc3')
+validate_sc4 = robjects.r('validate_sc4')
 
 
 
@@ -84,7 +89,7 @@ validate_aim_2 = robjects.r('validate_aim_2')
 # Predictions will be validated and scored
 
 
-def validate_func(submission_path, goldstandard_path):
+def validate_py_sc1(submission_path, goldstandard_path):
     '''
     Validate submission.
 
@@ -108,11 +113,16 @@ def validate_func(submission_path, goldstandard_path):
     # Sometimes participants accidentally submit Projects/Folders
     assert not isinstance(submission_path, Submission), \
         "Submission must be a Synapse File and not Project/Folder"
+        
+    validation_result = validate_sc1(submission_path,goldstandard_path)
+    assert validation_result[0][0]==0, \
+    	validation_result[1][0]
+    
     is_valid = True
     message = "Passed Validation"
     return(is_valid, message)
 
-def validate_func_aim_1_1(submission_path, goldstandard_path):
+def validate_py_sc2(submission_path, goldstandard_path):
     '''
     Validate submission for aim 1.1
 
@@ -136,10 +146,83 @@ def validate_func_aim_1_1(submission_path, goldstandard_path):
     # Sometimes participants accidentally submit Projects/Folders
     assert not isinstance(submission_path, Submission), \
         "Submission must be a Synapse File and not Project/Folder"
+        
+    validation_result = validate_sc2(submission_path,goldstandard_path)
+    assert validation_result[0][0]==0, \
+    	validation_result[1][0]
+    
+    is_valid = True
+    message = "Passed Validation"
+    return(is_valid, message)
+    
+    
+def validate_py_sc3(submission_path, goldstandard_path):
+    '''
+    Validate submission for aim 1.1
+
+    MUST USE ASSERTION ERRORS!!!
+
+    eg.
+    >>> assert os.path.basename(submission_path) == "prediction.tsv", \
+    >>> "Submission file must be named prediction.tsv"
+    or raise AssertionError()...
+    Only assertion errors will be returned to participants,
+    all other errors will be returned to the admin
+
+    Args:
+        submission_path:  Path to submission file
+        goldstandard_path: Path to truth file
+
+    Returns:
+        Must return a boolean and validation message
+    '''
+    from synapseclient import Submission
+    # Sometimes participants accidentally submit Projects/Folders
+    assert not isinstance(submission_path, Submission), \
+        "Submission must be a Synapse File and not Project/Folder"
+    
+    validation_result = validate_sc3(submission_path,goldstandard_path)
+    assert validation_result[0][0]==0, \
+    	validation_result[1][0]
+        
     is_valid = True
     message = "Passed Validation"
     return(is_valid, message)
 
+
+def validate_py_sc4(submission_path, goldstandard_path):
+    '''
+    Validate submission for aim 1.1
+
+    MUST USE ASSERTION ERRORS!!!
+
+    eg.
+    >>> assert os.path.basename(submission_path) == "prediction.tsv", \
+    >>> "Submission file must be named prediction.tsv"
+    or raise AssertionError()...
+    Only assertion errors will be returned to participants,
+    all other errors will be returned to the admin
+
+    Args:
+        submission_path:  Path to submission file
+        goldstandard_path: Path to truth file
+
+    Returns:
+        Must return a boolean and validation message
+    '''
+    from synapseclient import Submission
+    # Sometimes participants accidentally submit Projects/Folders
+    assert not isinstance(submission_path, Submission), \
+        "Submission must be a Synapse File and not Project/Folder"
+    
+    validation_result = validate_sc4(submission_path,goldstandard_path)
+    assert validation_result[0][0]==0, \
+    	validation_result[1][0]
+    
+        
+    is_valid = True
+    message = "Passed Validation"
+    return(is_valid, message)
 
 
 def validate_writeup(submission, goldstandard_path, syn,
@@ -226,30 +309,68 @@ def score2(submission_path, goldstandard_path):
     message = "Your submission has been scored!"
     return(score_dict, message)
 
+def score3(submission_path, goldstandard_path):
+    '''
+    Scoring function number 1
+
+    Args:
+        submission_path:  Path to submission file
+        goldstandard_path: Path to truth file
+
+    Returns:
+        Must return score dictionary and a scoring message
+    '''
+    score1 = 4
+    score2 = 3
+    score3 = 2
+    score_dict = dict(score=round(score1, 4), rmse=score2, auc=score3)
+    message = "Your submission has been scored!"
+    return(score_dict, message)
+
+
+def score4(submission_path, goldstandard_path):
+    '''
+    Scoring function number 2
+
+    Args:
+        submission_path:  Path to submission file
+        goldstandard_path: Path to truth file
+
+    Returns:
+        Must return score dictionary and a scoring message
+    '''
+    # Score against goldstandard
+    score1 = 2
+    score2 = 3
+    score3 = 5
+    score_dict = dict(score=round(score1, 4), rmse=score2, auc=score3)
+    message = "Your submission has been scored!"
+    return(score_dict, message)
+
 
 EVALUATION_QUEUES_CONFIG = [
     {
         'id': 9614297,
         'scoring_func': score1,
-        'validation_func': validate_func1,
+        'validation_func': validate_py_sc1,
         'goldstandard_path': 'path/to/sc1gold.txt'
     },
     {
        'id': 9614298,
        'scoring_func': score2,
-       'validation_func': validate_func2,
+       'validation_func': validate_py_sc2,
        'goldstandard_path': 'path/to/sc2gold.txt'
     },
     {
         'id': 9614299,
         'scoring_func': score3,
-        'validation_func': validate_func3,
-        'goldstandard_path': 'path/to/sc1gold.txt'
+        'validation_func': validate_py_sc3,
+        'goldstandard_path': 'path/to/sc3gold.txt'
     },
     {
        'id': 9614300,
        'scoring_func': score4,
-       'validation_func': validate_func4,
-       'goldstandard_path': 'path/to/sc2gold.txt'
+       'validation_func': validate_py_sc4,
+       'goldstandard_path': 'path/to/sc4gold.txt'
     }
 ]

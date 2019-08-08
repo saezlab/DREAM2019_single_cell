@@ -16,7 +16,7 @@ library(readr)
 #' computes root-mean square error by conditions, then averages these
 
 
-score_aim_2 <- function(prediction_data_file,validation_data_file){
+score_sc4 <- function(prediction_data_file,validation_data_file){
 	
 	# load validation data
 	validation_data <- read_csv (validation_data_file) 

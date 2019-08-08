@@ -53,7 +53,7 @@ data_to_stats <- function(single_cell_data){
 #' computes root-mean square error by conditions, then averages these
 
 
-score_aim_1_2_2 <- function(prediction_data_file,validation_data_file){
+score_sc3 <- function(prediction_data_file,validation_data_file){
 	
 	# load validation data
 	validation_data <- read_csv (validation_data_file) %>% select(-fileID,-cellID)
