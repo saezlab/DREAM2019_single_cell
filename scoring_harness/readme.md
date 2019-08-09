@@ -15,7 +15,7 @@ If you have no idea what evaluation queues or challenge are, then please turn ba
 * Software:
 ```
 pip install synapseclient
-pip install git+https://github.com/Sage-Bionetworks/challengeutils.git
+pip install git+https://github.com/Sage-Bionetworks/challengeutils.git@scoreharness
 # If you are using rpy2, must install version 2.9.x
 pip install rpy2==2.9
 ```
@@ -52,14 +52,14 @@ As stated above, Synapse does not have the capability of validating and scoring 
 Here are some examples on how to run the script.
 
 ```
-# See all the available parameters
-python challenge.py -h
+# After installation of challengeutils, you should have runchallenge.py as an executable. See all the available parameters.  
+runchallenge.py -h
 
 # Validation
-python challenge.py syn1234 challenge_config.template.py --send-messages --notifications --acknowledge-receipt validate
+runchallenge.py syn1234 challenge_config.template.py --send-messages --notifications --acknowledge-receipt validate
 
 # Scoring
-python challenge.py syn1234 challenge_config.template.py --send-messages --notifications --acknowledge-receipt score
+runchallenge.py syn1234 challenge_config.template.py --send-messages --notifications --acknowledge-receipt score
 
 ```
 
@@ -86,6 +86,6 @@ It is very typical for validation and scoring to occur every 5 to 10 minutes, as
 Paste this into the file:
 
 	# minute (m), hour (h), day of month (dom), month (mon)                      
-	*/10 * * * * python challenge.py ....
+	*/10 * * * * runchallenge.py ....
 
 Note: the first 5 * stand for minute (m), hour (h), day of month (dom), and month (mon). The configuration to have a job be done every ten minutes would look something like */10 * * * *
