@@ -242,7 +242,7 @@ def validate_writeup(submission, goldstandard_path, syn,
 
 def score1(submission_path, goldstandard_path):
     '''
-    Scoring function number 1
+    Scoring function for subchallenge 1
 
     Args:
         submission_path:  Path to submission file
@@ -251,10 +251,8 @@ def score1(submission_path, goldstandard_path):
     Returns:
         Must return score dictionary and a scoring message
     '''
-    score1 = 4
-    score2 = 3
-    score3 = 2
-    score_dict = dict(score=round(score1, 4), rmse=score2, auc=score3)
+    sc = score_sc1(submission_path, goldstandard_path )
+    score_dict = dict(score=round(sc[0], 6))
     message = "Your submission has been scored!"
     return(score_dict, message)
 
@@ -271,10 +269,9 @@ def score2(submission_path, goldstandard_path):
         Must return score dictionary and a scoring message
     '''
     # Score against goldstandard
-    score1 = 2
-    score2 = 3
-    score3 = 5
-    score_dict = dict(score=round(score1, 4), rmse=score2, auc=score3)
+    sc = score_sc2(submission_path, goldstandard_path)
+    
+    score_dict = dict(score=round(sc[0], 6))
     message = "Your submission has been scored!"
     return(score_dict, message)
 
@@ -290,10 +287,9 @@ def score3(submission_path, goldstandard_path):
     Returns:
         Must return score dictionary and a scoring message
     '''
-    score1 = 4
-    score2 = 3
-    score3 = 2
-    score_dict = dict(score=round(score1, 4), rmse=score2, auc=score3)
+    sc = score_sc3(submission_path, goldstandard_path)
+    
+    score_dict = dict(score=round(sc[0], 6))
     message = "Your submission has been scored!"
     return(score_dict, message)
 
@@ -310,10 +306,9 @@ def score4(submission_path, goldstandard_path):
         Must return score dictionary and a scoring message
     '''
     # Score against goldstandard
-    score1 = 2
-    score2 = 3
-    score3 = 5
-    score_dict = dict(score=round(score1, 4), rmse=score2, auc=score3)
+    sc = score_sc4(submission_path, goldstandard_path)
+    
+    score_dict = dict(score=round(sc[0], 6))
     message = "Your submission has been scored!"
     return(score_dict, message)
 
@@ -323,24 +318,24 @@ EVALUATION_QUEUES_CONFIG = [
         'id': 9614297,
         'scoring_func': score1,
         'validation_func': validate_py_sc1,
-        'goldstandard_path': os.path.join(script_dir, 'sc1gold.txt')
+        'goldstandard_path': os.path.join(script_dir, 'sc1gold.csv')
     },
     {
         'id': 9614298,
         'scoring_func': score2,
         'validation_func': validate_py_sc2,
-        'goldstandard_path': os.path.join(script_dir, 'sc2gold.txt')
+        'goldstandard_path': os.path.join(script_dir, 'sc2gold.csv')
     },
     {
         'id': 9614302,
         'scoring_func': score3,
         'validation_func': validate_py_sc3,
-        'goldstandard_path': os.path.join(script_dir, 'sc3gold.txt')
+        'goldstandard_path': os.path.join(script_dir, 'sc3gold.csv')
     },
     {
         'id': 9614303,
         'scoring_func': score4,
         'validation_func': validate_py_sc4,
-        'goldstandard_path': os.path.join(script_dir, 'sc4gold.txt')
+        'goldstandard_path': os.path.join(script_dir, 'sc4gold.csv')
     }
 ]

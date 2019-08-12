@@ -1,8 +1,4 @@
 
-# How about MI instead of covariance ?
-# how about weighting stats stronger if it is further from zero?
-
-
 library(dplyr)
 library(tidyr)
 library(readr)
@@ -41,21 +37,8 @@ score_sc4 <- function(prediction_data_file,validation_data_file){
 	prediction_data = prediction_data %>% select(required_columns)
 	# as we agreed, we remove plcg and her2 from the validation data:
 	validation_data = validation_data %>% select(required_columns)
-	
-	# checking for any missing conditions
-	required_conditions <- validation_data %>% select(cell_line,treatment,time) %>% unique()
-	predicted_conditions <- prediction_data %>% select(cell_line,treatment,time)
-	
-	missing_conditions = anti_join(required_conditions,predicted_conditions,by = c("cell_line", "treatment", "time"))
-	
-	if(nrow(missing_conditions)>0){
-		print("table showing the conditions missing from the submitted predictions:")
-		print(missing_conditions %>% select(c("cell_line", "treatment", "time")))
-		stop("missing predictions detected for above conditions")	
-	} 
-	
-	
-	### Formating -------------------------
+
+		### Formating -------------------------
 	# join the test and validation data
 	
 	combined_data = full_join(prediction_data %>% gather(marker,prediction,-cell_line, -treatment, -time ),
@@ -67,7 +50,6 @@ score_sc4 <- function(prediction_data_file,validation_data_file){
 	RMSE_cond = combined_data %>% group_by(cell_line,treatment,marker) %>% 
 		summarise(RMSE = sqrt(sum((test - prediction)^2)/n())) 
 	
-
 	final_score = mean(RMSE_cond$RMSE)
 }
 

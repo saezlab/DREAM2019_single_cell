@@ -72,23 +72,10 @@ score_sc3 <- function(prediction_data_file,validation_data_file){
 						  'p.S6', 'p.S6K', 'p.SMAD23', 'p.SRC', 'p.STAT1',
 						  'p.STAT3', 'p.STAT5') 
 	
-	if(!all(required_columns %in% names(prediction_data))) {
-		stop(paste0("missing columns detected. Required columns: ", paste(required_columns,collapse = ", ")))
-	}
 	prediction_data = prediction_data %>% select(required_columns)
 	# as we agreed, we remove plcg and her2 from the validation data:
 	validation_data = validation_data %>% select(required_columns)
 	
-	# checking for any missing conditions
-	required_conditions <- validation_data %>% select(cell_line,treatment,time) %>% unique()
-	predicted_conditions <- prediction_data %>% select(cell_line,treatment,time)
-	
-	missing_conditions = anti_join(required_conditions,predicted_conditions,by = c("cell_line", "treatment", "time"))
-	
-	if(nrow(missing_conditions)>0){
-		print(missing_conditions %>% select(c("cell_line", "treatment", "time")))
-		stop("missing predictions detected for above conditions")	
-	} 
 	
 	## Calculate statistics from single cell-data -----------------
 	validation_stats <- data_to_stats(validation_data) %>% rename(test_stat_value = stat_value)
@@ -104,6 +91,7 @@ score_sc3 <- function(prediction_data_file,validation_data_file){
 	# calculate the  distance over all stats
 	final_score = dist(rbind(test = combined_data$test_stat_value,
 							 prediction =combined_data$predicted_stat_value), method = "euclidean")
+	return(as.numeric(final_score))
 }
 
 
