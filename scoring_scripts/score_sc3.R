@@ -4,6 +4,7 @@
 library(dplyr)
 library(tidyr)
 library(purrr)
+library(tibble)
 library(readr)
 
 # this function computes the mean and covariance matrices from the single cell data
