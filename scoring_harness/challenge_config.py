@@ -64,7 +64,7 @@ validate_sc4 = robjects.r('validate_sc4')
 
 def validate_py_sc1(submission_path, goldstandard_path):
     '''
-    Validate submission.
+    Validate submission for subchallenge 1. 
 
     MUST USE ASSERTION ERRORS!!!
 
@@ -97,7 +97,7 @@ def validate_py_sc1(submission_path, goldstandard_path):
 
 def validate_py_sc2(submission_path, goldstandard_path):
     '''
-    Validate submission for aim 1.1
+    Validate submission for subchallenge 2. 
 
     MUST USE ASSERTION ERRORS!!!
 
@@ -130,7 +130,7 @@ def validate_py_sc2(submission_path, goldstandard_path):
 
 def validate_py_sc3(submission_path, goldstandard_path):
     '''
-    Validate submission for aim 1.1
+    Validate submission for subchallenge 3.
 
     MUST USE ASSERTION ERRORS!!!
 
@@ -163,7 +163,7 @@ def validate_py_sc3(submission_path, goldstandard_path):
 
 def validate_py_sc4(submission_path, goldstandard_path):
     '''
-    Validate submission for aim 1.1
+    Validate submission for subchallenge 4.
 
     MUST USE ASSERTION ERRORS!!!
 
@@ -259,7 +259,7 @@ def score1(submission_path, goldstandard_path):
 
 def score2(submission_path, goldstandard_path):
     '''
-    Scoring function number 2
+    Scoring function for subchallenge 2
 
     Args:
         submission_path:  Path to submission file
@@ -278,7 +278,7 @@ def score2(submission_path, goldstandard_path):
 
 def score3(submission_path, goldstandard_path):
     '''
-    Scoring function number 1
+    Scoring function for subchallenge 3
 
     Args:
         submission_path:  Path to submission file
@@ -296,7 +296,7 @@ def score3(submission_path, goldstandard_path):
 
 def score4(submission_path, goldstandard_path):
     '''
-    Scoring function number 2
+    Scoring function for subchallenge 4
 
     Args:
         submission_path:  Path to submission file
