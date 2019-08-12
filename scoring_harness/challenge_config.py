@@ -24,18 +24,11 @@ import os
 
 # scoring scripts:
 # __file__ = os.path.join(os.getcwd(), "challenge_config.py")
-score1_path = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    '../scoring_scripts', 'score_sc1.R')
-score2_path = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    '../scoring_scripts', 'score_sc2.R')
-score3_path = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    '../scoring_scripts', 'score_sc3.R')
-score4_path = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    '../scoring_scripts', 'score_sc4.R')
+script_dir = os.path.dirname(os.path.abspath(__file__))
+score1_path = os.path.join(script_dir, '../scoring_scripts', 'score_sc1.R')
+score2_path = os.path.join(script_dir, '../scoring_scripts', 'score_sc2.R')
+score3_path = os.path.join(script_dir, '../scoring_scripts', 'score_sc3.R')
+score4_path = os.path.join(script_dir, '../scoring_scripts', 'score_sc4.R')
 
 robjects.r("source('{}')".format(score1_path))
 robjects.r("source('{}')".format(score2_path))
@@ -48,18 +41,10 @@ score_sc3 = robjects.r('score_sc3')
 score_sc4 = robjects.r('score_sc4')
 
 # validation scripts in R
-validate1_path = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    '../scoring_scripts', 'validate_sc1.R')
-validate2_path = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    '../scoring_scripts', 'validate_sc2.R')
-validate3_path = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    '../scoring_scripts', 'validate_sc3.R')
-validate4_path = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    '../scoring_scripts', 'validate_sc4.R')
+validate1_path = os.path.join(script_dir, '../scoring_scripts', 'validate_sc1.R')
+validate2_path = os.path.join(script_dir, '../scoring_scripts', 'validate_sc2.R')
+validate3_path = os.path.join(script_dir, '../scoring_scripts', 'validate_sc3.R')
+validate4_path = os.path.join(script_dir, '../scoring_scripts', 'validate_sc4.R')
 
 robjects.r("source('{}')".format(validate1_path))
 robjects.r("source('{}')".format(validate2_path))
@@ -338,24 +323,24 @@ EVALUATION_QUEUES_CONFIG = [
         'id': 9614297,
         'scoring_func': score1,
         'validation_func': validate_py_sc1,
-        'goldstandard_path': 'path/to/sc1gold.txt'
+        'goldstandard_path': os.path.join(script_dir, 'sc1gold.txt')
     },
     {
         'id': 9614298,
         'scoring_func': score2,
         'validation_func': validate_py_sc2,
-        'goldstandard_path': 'path/to/sc2gold.txt'
+        'goldstandard_path': os.path.join(script_dir, 'sc2gold.txt')
     },
     {
         'id': 9614302,
         'scoring_func': score3,
         'validation_func': validate_py_sc3,
-        'goldstandard_path': 'path/to/sc3gold.txt'
+        'goldstandard_path': os.path.join(script_dir, 'sc3gold.txt')
     },
     {
         'id': 9614303,
         'scoring_func': score4,
         'validation_func': validate_py_sc4,
-        'goldstandard_path': 'path/to/sc4gold.txt'
+        'goldstandard_path': os.path.join(script_dir, 'sc4gold.txt')
     }
 ]
