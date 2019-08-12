@@ -3,6 +3,7 @@
 # how about weighting stats stronger if it is further from zero?
 library(dplyr)
 library(tidyr)
+library(purrr)
 library(readr)
 
 # this function computes the mean and covariance matrices from the single cell data
