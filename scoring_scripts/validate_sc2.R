@@ -41,6 +41,7 @@ validate_sc2 <- function(prediction_data_file,validation_data_file){
 	if(!all(required_columns %in% names(prediction_data))) {
 		error_status$state = -1
 		error_status$message = paste0("missing columns detected. Required columns: ", paste(required_columns,collapse = ", "))
+		return(error_status)
 	}
 	prediction_data = prediction_data %>% select(required_columns)
 	# as we agreed, we remove plcg and her2 from the validation data:
