@@ -21,6 +21,14 @@ validate_sc1 <- function(prediction_data_file, validation_data_file) {
   validation_data <- read_csv(validation_data_file)
   prediction_data <- read_csv(prediction_data_file)
 
+  # Check for delim issues
+  if (length(prediction_data)==1){
+  	error_status$state = -1
+  	error_status$message = paste0("Only 1 column detected. Make sure to submit comma-separated table. ",
+  								  "We recommend readr::write_csv() if you are an R user.")
+  	return(error_status)
+  }
+  
   ### Checking inputs -------------------
   # checking columns of input data table
   required_columns <- c("glob_cellID","cell_line", "treatment", "time", "cellID", "fileID", "p.Akt.Ser473.", "p.ERK", "p.HER2", "p.PLCg2", "p.S6")
