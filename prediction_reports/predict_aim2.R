@@ -1,7 +1,7 @@
 # we play around the AIM 2 idea. 
 
 
-
+library(ranger)
 library(tidyverse)
 library(pheatmap)
 library(RColorBrewer)
@@ -9,8 +9,9 @@ library(RColorBrewer)
 
 ### Data import
 
-median_interpolated_data <- read_rds("./data/median_data/interpolated_median_all_reporters_mine.rds")
-proteomics_raw <- readRDS("./data/proteomics/MSstat_groupComparison_selceted.rds") %>% as_tibble()
+median_interpolated_data <- read_csv("./challenge_data/median_phospho/median_phospho_data.csv")
+proteomics_raw <- read_csv("./challenge_data/proteomics/proteomics.csv") 
+cell_lines_usage <- read_csv("./challenge_data/cell_line_usage.csv")
 #rnaseq_raw <- readRDS("./data/genomics/dat_RNAseq_Marcotte.rds") %>% as_tibble()
 
 
@@ -26,41 +27,50 @@ proteomics <- proteomics_raw %>%
 	spread(Protein,value)
 
 
-# cell_lines <- rnaseq_raw$Cellline
-# rnaseq_raw$Cellline <- NULL
-# rnaseq_raw <- type_convert(rnaseq_raw, col_types = cols(.default = col_double()))
-# rnaseq_raw <- bind_cols(data.frame(cell_lines=cell_lines), rnaseq_raw)
-# rnaseq <- rnaseq_raw %>% gather("gene","value",-cell_lines) %>% as_tibble()
+# setup the model inputs ----------
+
+# no need to build model for Her2 and plcgamma
+median_interpolated_data$p.HER2 = NULL
+median_interpolated_data$p.PLCg2 = NULL
 
 
-
-### Proteomics only ------------------------------------------------------------
-
-
-
-#### predict each phospho in each condition ----------------------------------
-library(ranger)
 # celllines with proteomics data:
 cell_lines =  unique(median_interpolated_data$cell_line) 
 cell_lines <- cell_lines[cell_lines %in% proteomics$cell_line]
 
 colnames(proteomics) <- make.names(colnames(proteomics))
 
-# Spliting training and testing dataset
-training_cellines = sample(cell_lines , length(cell_lines) * 0.8, replace = FALSE ) 
-# test: 
-# test_cellines = c("BT20", "BT474", "CAL148", "EFM19", "EFM192A", "HCC1937", "HCC1954",
-#  "HCC2157", "MDAkb2", "MDAMB361", "MDAMB436", "MDAMB453", "OCUBM")   
+# Finding cells for training 
 
-# genes = colnames(proteomics)
-# f = as.formula( paste( "value ~", paste( n[!n %in% c("cell_line")], collapse = "+" ) ) )
+training_cellines = cell_lines_usage %>% filter(complete==TRUE) %>% pull(cell_line)
+
+# test: 
+test_data <- read_csv("challenge_data/prediction_templates/subchallenge_4_template_data.csv") %>% 
+	gather(reporter,value,-cell_line, -treatment,  -time) %>% mutate(purpose = "predict")
+test_celllines <- test_data %>% pull(cell_line) %>% unique()
+
+median_data = median_interpolated_data %>% 
+	filter(cell_line %in% c(training_cellines,test_celllines)) %>%
+	mutate(purpose =ifelse(cell_line %in% training_cellines, "train","predict")) %>%
+	gather(reporter,value,-cell_line, -treatment,  -time, -purpose) 
 
 
 # model_v1: for each reporter we build a model condition-wise, independently
-source("prediction_reports/aim2_model_v1.R")
-model_v1_results = aim2_model_v1(median_interpolated_data,proteomics,training_cellines)
+source("prediction_reports/aim2_model_v5.R")
+model_v5_results = aim2_model_v5(median_data = median_data,
+								 test_celllines = test_celllines,
+								 test_data = test_data,
+								 proteomics = proteomics,
+								 training_cellines = training_cellines,
+								 recompute = TRUE)
 
-if(FALSE) saveRDS(model_v1_results,"./prediction_reports/aim2_model_predictions.RDS")
+
+model_v5_predictions %>% write_csv("./dry_run/aim2_model_predictions_train_test.csv")
+model_v5_predictions %>% filter(purpose == "predict") %>%
+	select(cell_line,treatment,time,reporter,predicted_value) %>%
+	spread(reporter,predicted_value) %>% write_csv("./dry_run/aim2_model_predictions_test.csv")
+
+
 
 ##### plot prediction results for model_v1 -------------------------------------
 pdf("./prediction_reports/aim2_predictions.pdf")
@@ -176,42 +186,3 @@ neigbourhood <- OP_interactions %>% as_tibble() %>%
 
 
 
-
-
-# reduce the dimensionality of the proteomics via PCA
-#############
-pca_trainset = trainset %>% select( -value,-cell_line )
-pca_testset = testset
-pca = prcomp( pca_trainset )
-
-# variance
-pr_var = ( pca$sdev )^2 
-
-# % of variance
-prop_varex = pr_var / sum( pr_var )
-
-# Plot
-plot( prop_varex, xlab = "Principal Component", 
-	  ylab = "Proportion of Variance Explained", type = "b" )
-
-summary(pca)
-#plot(cumsum(proteomics_pca$sdev^2/sum(proteomics_pca$sdev^2)))
-
-# Creating a new dataset
-train = data.frame( value = trainset$value, pca$x )
-t = as.data.frame( predict( pca, newdata = pca_testset ) )
-
-new_trainset = train[, 1:36]
-new_testset =  t[, 1:35]
-
-n = names( new_trainset )
-f = as.formula( paste( "value ~", paste( n[!n %in% c("value")], collapse = "+" ) ) )
-
-library(ranger)
-
-rg.res1 <- ranger(value ~ ., data = new_trainset, )
-pred.training <- predict(rg.res1, data = new_trainset)
-pred.test <- predict(rg.res1, data = new_testset)
-
-plot(pred.value$predictions, trainset$value)
-points(pred.test$predictions, test$value, col="red")
