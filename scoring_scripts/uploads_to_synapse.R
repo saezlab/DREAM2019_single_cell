@@ -4,7 +4,7 @@
 
 library(synapser)
 
-synLogin(email="attilagabor", apiKey="/YwdwbcFPKfTSazwKChjXSXd/ZZ8BQ0DXOkh/JuGWvmGtnZCfUfRuZ5Ixid5RjGdvH0J8QlUImDtlBpsC4uRIA==",rememberMe=TRUE)
+synLogin(email="attilagabor")
 
 # live site
 live_challenge_data_folder = "syn20564743"
@@ -71,6 +71,18 @@ for (template_files in list.files("./challenge_data/transcriptomics_genomics/",f
 }
 
 
+# proteomics data -------------------------------------------------------------
+base_folder_ent = Folder("proteomics", parentId=live_challenge_data_folder)
+stored_base_folder_ent = synStore(base_folder_ent)
+
+for (template_files in list.files("./challenge_data/proteomics/",full.names = T)){
+	
+	template_data_ent = File(template_files, parentId=stored_base_folder_ent$properties$id)
+	synStore(template_data_ent)
+}
+
+
+
 # Supplementary files ----------------------------------------------------------
 
 file1 = File("./challenge_data/Antibody_table.csv", parentId=live_challenge_data_folder)
@@ -79,7 +91,8 @@ file2 = File("./challenge_data/CellLines.csv", parentId=live_challenge_data_fold
 synStore(file2)
 file3 = File("./challenge_data/FileID_table.csv", parentId=live_challenge_data_folder)
 synStore(file3)
-
+file4 = File("./challenge_data/prior_knowledge.sif", parentId=live_challenge_data_folder)
+synStore(file4)
 
 
 ### Validation data ------------------------------------------------------------
