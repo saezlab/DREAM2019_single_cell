@@ -41,10 +41,14 @@ score_sc3 = robjects.r('score_sc3')
 score_sc4 = robjects.r('score_sc4')
 
 # validation scripts in R
-validate1_path = os.path.join(script_dir, '../scoring_scripts', 'validate_sc1.R')
-validate2_path = os.path.join(script_dir, '../scoring_scripts', 'validate_sc2.R')
-validate3_path = os.path.join(script_dir, '../scoring_scripts', 'validate_sc3.R')
-validate4_path = os.path.join(script_dir, '../scoring_scripts', 'validate_sc4.R')
+validate1_path = os.path.join(
+    script_dir, '../scoring_scripts', 'validate_sc1.R')
+validate2_path = os.path.join(
+    script_dir, '../scoring_scripts', 'validate_sc2.R')
+validate3_path = os.path.join(
+    script_dir, '../scoring_scripts', 'validate_sc3.R')
+validate4_path = os.path.join(
+    script_dir, '../scoring_scripts', 'validate_sc4.R')
 
 robjects.r("source('{}')".format(validate1_path))
 robjects.r("source('{}')".format(validate2_path))
@@ -251,9 +255,10 @@ def score1(submission_path, goldstandard_path):
     Returns:
         Must return score dictionary and a scoring message
     '''
-    sc = score_sc1(submission_path, goldstandard_path )
+    sc = score_sc1(submission_path, goldstandard_path)
     score_dict = dict(score=round(sc[0], 6))
-    message = "Your submission has been scored!"
+    message = "Your submission has been scored! Score: " + \
+        str(score_dict.get('score'))
     return(score_dict, message)
 
 
@@ -270,9 +275,10 @@ def score2(submission_path, goldstandard_path):
     '''
     # Score against goldstandard
     sc = score_sc2(submission_path, goldstandard_path)
-    
+
     score_dict = dict(score=round(sc[0], 6))
-    message = "Your submission has been scored!"
+    message = "Your submission has been scored! Score: " + \
+        str(score_dict.get('score'))
     return(score_dict, message)
 
 
@@ -288,9 +294,10 @@ def score3(submission_path, goldstandard_path):
         Must return score dictionary and a scoring message
     '''
     sc = score_sc3(submission_path, goldstandard_path)
-    
+
     score_dict = dict(score=round(sc[0], 6))
-    message = "Your submission has been scored!"
+    message = "Your submission has been scored! Score: " + \
+        str(score_dict.get('score'))
     return(score_dict, message)
 
 
@@ -307,9 +314,10 @@ def score4(submission_path, goldstandard_path):
     '''
     # Score against goldstandard
     sc = score_sc4(submission_path, goldstandard_path)
-    
+
     score_dict = dict(score=round(sc[0], 6))
-    message = "Your submission has been scored!"
+    message = "Your submission has been scored! Score: " + \
+        str(score_dict.get('score'))
     return(score_dict, message)
 
 
