@@ -92,7 +92,7 @@ def validate_py_sc1(submission_path, goldstandard_path):
         "Submission must be a Synapse File and not Project/Folder"
 
     validation_result = validate_sc1(submission_path, goldstandard_path)
-    assert validation_result[0][0] == 0, validation_result[1][0]
+    assert validation_result[0][0] == 0, validation_result[1][0][:1000]
 
     is_valid = True
     message = "Passed Validation"
@@ -125,7 +125,7 @@ def validate_py_sc2(submission_path, goldstandard_path):
         "Submission must be a Synapse File and not Project/Folder"
 
     validation_result = validate_sc2(submission_path, goldstandard_path)
-    assert validation_result[0][0] == 0, validation_result[1][0]
+    assert validation_result[0][0] == 0, validation_result[1][0][:1000]
 
     is_valid = True
     message = "Passed Validation"
@@ -158,7 +158,7 @@ def validate_py_sc3(submission_path, goldstandard_path):
         "Submission must be a Synapse File and not Project/Folder"
 
     validation_result = validate_sc3(submission_path, goldstandard_path)
-    assert validation_result[0][0] == 0, validation_result[1][0]
+    assert validation_result[0][0] == 0, validation_result[1][0][:1000]
 
     is_valid = True
     message = "Passed Validation"
@@ -191,7 +191,7 @@ def validate_py_sc4(submission_path, goldstandard_path):
         "Submission must be a Synapse File and not Project/Folder"
 
     validation_result = validate_sc4(submission_path, goldstandard_path)
-    assert validation_result[0][0] == 0, validation_result[1][0]
+    assert validation_result[0][0] == 0, validation_result[1][0][:1000]
 
     is_valid = True
     message = "Passed Validation"
@@ -256,9 +256,9 @@ def score1(submission_path, goldstandard_path):
         Must return score dictionary and a scoring message
     '''
     sc = score_sc1(submission_path, goldstandard_path)
-    score_dict = dict(score=round(sc[0], 6))
-    message = "Your submission has been scored! Score: " + \
-        str(score_dict.get('score'))
+    score_dict = dict(score=round(sc[0], 6), round=2)
+    score = score_dict.get('score')
+    message = f"Your submission has been scored! Score: {score}"
     return(score_dict, message)
 
 
@@ -276,9 +276,9 @@ def score2(submission_path, goldstandard_path):
     # Score against goldstandard
     sc = score_sc2(submission_path, goldstandard_path)
 
-    score_dict = dict(score=round(sc[0], 6))
-    message = "Your submission has been scored! Score: " + \
-        str(score_dict.get('score'))
+    score_dict = dict(score=round(sc[0], 6), round=2)
+    score = score_dict.get('score')
+    message = f"Your submission has been scored! Score: {score}"
     return(score_dict, message)
 
 
@@ -295,9 +295,9 @@ def score3(submission_path, goldstandard_path):
     '''
     sc = score_sc3(submission_path, goldstandard_path)
 
-    score_dict = dict(score=round(sc[0], 6))
-    message = "Your submission has been scored! Score: " + \
-        str(score_dict.get('score'))
+    score_dict = dict(score=round(sc[0], 6), round=2)
+    score = score_dict.get('score')
+    message = f"Your submission has been scored! Score: {score}"
     return(score_dict, message)
 
 
@@ -315,9 +315,9 @@ def score4(submission_path, goldstandard_path):
     # Score against goldstandard
     sc = score_sc4(submission_path, goldstandard_path)
 
-    score_dict = dict(score=round(sc[0], 6))
-    message = "Your submission has been scored! Score: " + \
-        str(score_dict.get('score'))
+    score_dict = dict(score=round(sc[0], 6), round=2)
+    score = score_dict.get('score')
+    message = f"Your submission has been scored! Score: {score}"
     return(score_dict, message)
 
 
