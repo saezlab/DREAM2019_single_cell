@@ -92,7 +92,7 @@ def validate_py_sc1(submission_path, goldstandard_path):
         "Submission must be a Synapse File and not Project/Folder"
 
     validation_result = validate_sc1(submission_path, goldstandard_path)
-    assert validation_result[0][0] == 0, validation_result[1][0]
+    assert validation_result[0][0] == 0, validation_result[1][0][:1000]
 
     is_valid = True
     message = "Passed Validation"
@@ -125,7 +125,7 @@ def validate_py_sc2(submission_path, goldstandard_path):
         "Submission must be a Synapse File and not Project/Folder"
 
     validation_result = validate_sc2(submission_path, goldstandard_path)
-    assert validation_result[0][0] == 0, validation_result[1][0]
+    assert validation_result[0][0] == 0, validation_result[1][0][:1000]
 
     is_valid = True
     message = "Passed Validation"
@@ -158,7 +158,7 @@ def validate_py_sc3(submission_path, goldstandard_path):
         "Submission must be a Synapse File and not Project/Folder"
 
     validation_result = validate_sc3(submission_path, goldstandard_path)
-    assert validation_result[0][0] == 0, validation_result[1][0]
+    assert validation_result[0][0] == 0, validation_result[1][0][:1000]
 
     is_valid = True
     message = "Passed Validation"
@@ -191,7 +191,7 @@ def validate_py_sc4(submission_path, goldstandard_path):
         "Submission must be a Synapse File and not Project/Folder"
 
     validation_result = validate_sc4(submission_path, goldstandard_path)
-    assert validation_result[0][0] == 0, validation_result[1][0]
+    assert validation_result[0][0] == 0, validation_result[1][0][:1000]
 
     is_valid = True
     message = "Passed Validation"
