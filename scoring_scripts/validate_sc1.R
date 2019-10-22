@@ -42,14 +42,16 @@ validate_sc1 <- function(prediction_data_file, validation_data_file) {
   prediction_data <- prediction_data %>% select(required_columns)
 
   # checking for any missing cell-predictions
-  missing_prediction_data <- anti_join(validation_data, prediction_data, by = c("glob_cellID"))
+  missing_prediction_data <- anti_join(
+  	validation_data %>% select("glob_cellID","cell_line", "treatment", "time", "cellID", "fileID"),
+  	prediction_data %>% select("glob_cellID","cell_line", "treatment", "time", "cellID", "fileID"), by = c("glob_cellID","cell_line", "treatment", "time", "cellID", "fileID"))
   if (nrow(missing_prediction_data) > 0) {
   	
   	error_status$state = -2
   	
-  	missing_ids = missing_prediction_data  %>%  pull(glob_cellID)
+  	missing_ids = missing_prediction_data  %>% unite("id", glob_cellID,cell_line, treatment, time, cellID, fileID, sep = "_")
   	
-  	error_status$message = paste0("missing predictions for cells with glob_cellID: ", paste(missing_ids,collapse = ", "))
+  	error_status$message = paste0("missing predictions for cells (glob_cellID_cell_line_treatment_time_cellID_fileID): ", paste(missing_ids$id,collapse = ", "))
   	return(error_status)
   	
   }
