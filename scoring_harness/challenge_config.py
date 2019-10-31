@@ -258,7 +258,7 @@ def score1(submission_path, goldstandard_path):
     sc = score_sc1(submission_path, goldstandard_path)
     score_dict = dict(score=round(sc[0], 6), round=3)
     score = score_dict.get('score')
-    message = f"Your submission has been scored! Score: {score}"
+    message = "Your submission has been scored!"
     return(score_dict, message)
 
 
@@ -278,7 +278,7 @@ def score2(submission_path, goldstandard_path):
 
     score_dict = dict(score=round(sc[0], 6), round=3)
     score = score_dict.get('score')
-    message = f"Your submission has been scored! Score: {score}"
+    message = "Your submission has been scored!"
     return(score_dict, message)
 
 
@@ -297,7 +297,7 @@ def score3(submission_path, goldstandard_path):
 
     score_dict = dict(score=round(sc[0], 6), round=3)
     score = score_dict.get('score')
-    message = f"Your submission has been scored! Score: {score}"
+    message = "Your submission has been scored!"
     return(score_dict, message)
 
 
@@ -317,7 +317,7 @@ def score4(submission_path, goldstandard_path):
 
     score_dict = dict(score=round(sc[0], 6), round=3)
     score = score_dict.get('score')
-    message = f"Your submission has been scored! Score: {score}"
+    message = "Your submission has been scored!"
     return(score_dict, message)
 
 
