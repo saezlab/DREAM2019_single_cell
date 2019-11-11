@@ -345,5 +345,11 @@ EVALUATION_QUEUES_CONFIG = [
         'scoring_func': score4,
         'validation_func': validate_py_sc4,
         'goldstandard_path': os.path.join(script_dir, 'sc4gold.csv')
+    },
+    {
+        'id': 9614264,
+        'scoring_func': None,
+        'validation_func': validate_writeup,
+        'goldstandard_path': None
     }
 ]
