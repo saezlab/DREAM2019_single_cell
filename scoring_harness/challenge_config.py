@@ -198,7 +198,7 @@ def validate_py_sc4(submission_path, goldstandard_path):
     return(is_valid, message)
 
 
-def validate_writeup(submission, goldstandard_path, syn,
+def validate_writeup(submission, goldstandard_path,
                      public=True, admin=None):
     '''
     Validates challenge writeup
@@ -216,6 +216,9 @@ def validate_writeup(submission, goldstandard_path, syn,
     '''
     from synapseclient.exceptions import SynapseHTTPError
     from synapseclient import AUTHENTICATED_USERS
+    import synapseclient
+
+    syn = synapseclient.login()
     # Add in users to share this with
     share_with = []
     try:
@@ -348,7 +351,7 @@ EVALUATION_QUEUES_CONFIG = [
     },
     {
         'id': 9614264,
-        'scoring_func': None,
+        'scoring_func': score1,  # will never run
         'validation_func': validate_writeup,
         'goldstandard_path': None
     }
