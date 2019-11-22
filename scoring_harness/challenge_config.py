@@ -198,7 +198,7 @@ def validate_py_sc4(submission_path, goldstandard_path):
     return(is_valid, message)
 
 
-def validate_writeup(submission, goldstandard_path, syn,
+def validate_writeup(submission, goldstandard_path,
                      public=True, admin=None):
     '''
     Validates challenge writeup
@@ -216,6 +216,9 @@ def validate_writeup(submission, goldstandard_path, syn,
     '''
     from synapseclient.exceptions import SynapseHTTPError
     from synapseclient import AUTHENTICATED_USERS
+    import synapseclient
+
+    syn = synapseclient.login()
     # Add in users to share this with
     share_with = []
     try:
@@ -256,9 +259,9 @@ def score1(submission_path, goldstandard_path):
         Must return score dictionary and a scoring message
     '''
     sc = score_sc1(submission_path, goldstandard_path)
-    score_dict = dict(score=round(sc[0], 6), round=2)
+    score_dict = dict(score=round(sc[0], 6), round=3)
     score = score_dict.get('score')
-    message = f"Your submission has been scored! Score: {score}"
+    message = "Your submission has been scored!"
     return(score_dict, message)
 
 
@@ -276,9 +279,9 @@ def score2(submission_path, goldstandard_path):
     # Score against goldstandard
     sc = score_sc2(submission_path, goldstandard_path)
 
-    score_dict = dict(score=round(sc[0], 6), round=2)
+    score_dict = dict(score=round(sc[0], 6), round=3)
     score = score_dict.get('score')
-    message = f"Your submission has been scored! Score: {score}"
+    message = "Your submission has been scored!"
     return(score_dict, message)
 
 
@@ -295,9 +298,9 @@ def score3(submission_path, goldstandard_path):
     '''
     sc = score_sc3(submission_path, goldstandard_path)
 
-    score_dict = dict(score=round(sc[0], 6), round=2)
+    score_dict = dict(score=round(sc[0], 6), round=3)
     score = score_dict.get('score')
-    message = f"Your submission has been scored! Score: {score}"
+    message = "Your submission has been scored!"
     return(score_dict, message)
 
 
@@ -315,9 +318,9 @@ def score4(submission_path, goldstandard_path):
     # Score against goldstandard
     sc = score_sc4(submission_path, goldstandard_path)
 
-    score_dict = dict(score=round(sc[0], 6), round=2)
+    score_dict = dict(score=round(sc[0], 6), round=3)
     score = score_dict.get('score')
-    message = f"Your submission has been scored! Score: {score}"
+    message = "Your submission has been scored!"
     return(score_dict, message)
 
 
@@ -345,5 +348,11 @@ EVALUATION_QUEUES_CONFIG = [
         'scoring_func': score4,
         'validation_func': validate_py_sc4,
         'goldstandard_path': os.path.join(script_dir, 'sc4gold.csv')
+    },
+    {
+        'id': 9614264,
+        'scoring_func': score1,  # will never run
+        'validation_func': validate_writeup,
+        'goldstandard_path': None
     }
 ]
