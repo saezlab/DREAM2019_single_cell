@@ -30,44 +30,11 @@ fix_leaderboard_raw <- function(LB){
 
 #'  fix the dates of the submission
 #'
-#' dates comes in various format because the copy-paste excel import messup. 
-#' we convert to a unified format:
-#' - fix the '19 --> 2019 , then the date and month is also changed... 
-#' - handle the AM/PM and the 24 hours base notation
+#' dates comes with a free format that should be converted
 #' @param date_string  vector containing the dates in the leaderboard
 #' @return date as a posixct class object
 
 fix_submission_dates <- function(date_string){
 	
-	# handles the date in a day.month.year AM/PM format, where year is only by 2 digits
-	# e.g "9.10.19 6:28 PM"   
-	# returns date in POSIXct format
-	DMY_fix <- function(str_in){
-		
-		gsub(x = str_in, pattern = ".19 ",replacement = ".2019 ",fixed = T) %>%
-			as.POSIXct(tryFormats=c("%d.%m.%Y %I:%M %p","%m.%d.%Y %I:%M %p"))
-	}
-	# handles the date in a month.day.year (AM/PM) format
-	# e.g. "10.01.2019  07:31:00"   or "08.12.2019  21:48:00 PM"  "09.27.2019 10:20 PM"
-	# returns date in POSIXct format
-	MDY_convert <- function(str_in){
-		
-		as.POSIXct(str_in, tryFormats=c("%m.%d.%Y %I:%M %p","%m.%d.%Y %H:%M"))
-	}
-	
-	timetable = tibble(date = date_string, order = 1:length(date_string))
-	
-	
-	tt1 <- timetable %>% 
-		filter(grepl(".19 ",date,fixed = TRUE)) %>%
-		mutate(fixed_date = DMY_fix(date))
-	tt2 <- timetable %>% 
-		filter(!grepl(".19 ",date,fixed = TRUE)) %>%
-		mutate(fixed_date = MDY_convert(date))
-	
-	
-	results <- bind_rows(tt1,tt2) %>%
-		arrange(order) %>%
-		pull(fixed_date)
-	return(results)
+	as.POSIXct(date_string, tryFormats=c("%m/%d/%Y %I:%M %p","%m/%d/%Y %H:%M"))
 }

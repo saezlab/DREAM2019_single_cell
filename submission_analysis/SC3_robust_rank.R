@@ -1,13 +1,19 @@
-# evaluating the rankings of the top performing teams in SC1
+# evaluating the rankings of the top performing teams in SC3
 #
 # author: Attila Gabor
 # 
 # Short summary:
-# In each of the subchallenges the scores are based on averaging the modelling 
-# errors across all conditions.
+# In this subchallenge the score is based on squared sum of the modelling 
+# errors (distance in median and covariance) across all conditions.
 # To assess if the small differences between the top performing teams are 
-# significant we utilise bootstrap sampling of the conditions. Then we calculate
-# the modelling error on each sample. Finally we compute the Bayes factor
+# significant we utilise bootstrap sampling of the conditions. We resample the
+# experimental conditions (defined by the triplet: cell-line, treatment and time)
+# with replacement and calculate the score for each team. 
+# 
+# Finally we compute the Bayes factor over the bootstraps for
+# consecutively ranked teams
+# B:= [sum(score(teamA) < score(teamB))] / [sum(score(teamA) > score(teamB))]
+# we consider a Bayes factor larger than 3 significant 
 
 
 library(tidyverse)
@@ -15,8 +21,6 @@ library(purrr)
 source("./scoring_scripts/score_sc2.R")
 # SC3 --------------------------------------------------------------------------
 
-# we take a subset of teams from the top of the rankings. 
-N_top <- 8
 
 # make sure to download the data of each team to this folder: 
 # naming convention for files: `submissionID`.csv
@@ -28,7 +32,20 @@ SC_leaderboard = read_csv(file.path(submission_folder,"leaderboard_final_sc3.csv
 	mutate(submissions = paste0(objectId,".csv")) %>% arrange(score) %>% 
 	mutate(submitterId = make.names(submitterId))
 
+# we take a subset of teams from the top of the rankings. 
+N_top <- 14
+
 ranked_teams <- factor(SC_leaderboard$submitterId[1:N_top],levels = SC_leaderboard$submitterId[1:N_top])
+
+SC_leaderboard %>%  filter(score <1e3) %>%
+	ggplot(aes(factor(submitterId,levels = SC_leaderboard$submitterId),score)) +
+	geom_point() + 
+	theme_bw() +
+	xlab("Teams") + 
+	ylab("Score") + 
+	ggtitle("Final leaderboard for subchallenge III") + 
+	theme(axis.text.x = element_text(hjust=1,angle = 45))
+ggsave("./submission_analysis/figures/SC3_leaderboard.pdf",width = 6,height = 5)
 
 # read team's predictions from csv files and compute the stats
 required_columns <- c('cell_line','treatment', 'time',
@@ -47,6 +64,7 @@ read_to_stats <- function(file_name){
 
 	read_csv(file_name) %>% select(required_columns) %>% data_to_stats(.)
 }
+
 prediction_data <- SC_leaderboard  %>%
  	slice(1:N_top) %>% 
 	mutate(predictions = map(file.path(submission_folder,submissions),read_to_stats))
@@ -95,12 +113,6 @@ RMSE_conditions <- combined_statistics %>%
 N_bootstrap <- 1000
 set.seed(123)
 
-bootstrap_stats1 <- tibble(BS_sample = seq(N_bootstrap)) %>%
-	mutate( map(BS_sample, .f = ~ combined_statistics %>% 
-						 	sample_frac(size = 1, replace = TRUE) %>%
-						 	summarise_at(as.character(ranked_teams),~ sqrt(sum((standard - .)^2)))
-				)) %>% unnest()
-
 # add ID for conditions
 combined_statistics <- combined_statistics %>%
 	mutate(cond_id = paste(cell_line,treatment,time,sep = "_")) %>%
@@ -111,7 +123,6 @@ combined_statistics <- combined_statistics %>%
 # 1. we calculate ahead the squared diff between the stats for each condition
 # 2. for each BS sample select conditions with replacement
 # 3. sum up the squared differences and take the square root of the sum 
-
 
 condition_stats_SumSquared <- combined_statistics %>% 
 	group_by(cond_id) %>% 
@@ -126,32 +137,51 @@ bootstrap_stats <- tibble(BS_sample = seq(N_bootstrap)) %>%
 
 
 
-
-
-
-# order the boostraps by the best team and plot RMSE vs Bootstraps
-bootstrap_stats %>% arrange(icx_bxai) %>% 
-	mutate(BS_sample = 1:N_bootstrap) %>%
-	gather(teams,RMSE,-BS_sample) %>%
-	mutate(teams = factor(teams,levels = levels(ranked_teams))) %>%
-	ggplot() + geom_point(aes(BS_sample, RMSE,color=teams)) + 
-	theme_bw() + 
-	ggtitle("Subchallenge III: performance for each bootstrap sample")
-
 # plotting by boxplot
-bootstrap_stats1 %>% 
-	gather(teams,RMSE,-BS_sample) %>%
+bootstrap_stats %>% 
+	gather(teams,score,-BS_sample) %>%
 	mutate(teams = factor(teams,levels = levels(ranked_teams))) %>%
-	ggplot() + geom_boxplot(aes(teams, RMSE,color=teams)) + 
+	ggplot() + geom_boxplot(aes(teams, score,color=teams)) + 
 	ggtitle("Subchallenge III: performance over bootstrap samples") + 
 	geom_point(data = SC_leaderboard %>% filter(submitterId %in% ranked_teams), aes(submitterId,score)) + 
 	theme_bw() +
 	theme(axis.text.x = element_text(hjust=1,angle = 45))
 ggsave("./submission_analysis/figures/SCIII_score_bootstrap.pdf",width = 10,height = 6)
 
-Bayes_factors <- bootstrap_stats %>% 
-	summarise(icx_bxai_vs_orangeballs = sum(icx_bxai<orangeballs)/sum(icx_bxai>orangeballs), 
-			  orangeballs_vs_AMbeRland = sum(orangeballs<AMbeRland)/sum(orangeballs>AMbeRland), 
-			  AMbeRland_vs_msinkala = sum(AMbeRland<X.msinkala)/sum(AMbeRland>X.msinkala), 
-			  msinkala_vs_GaoGao199694 = sum(X.msinkala<X.GaoGao199694)/sum(X.msinkala>X.GaoGao199694),
-			  NAD_vs_PaL = sum(NAD<PaL)/sum(NAD>PaL))
+
+
+# show the ranks across Bootstraps
+bootstrap_stats %>% ungroup() %>%
+	gather(team, score, as.character(ranked_teams), -BS_sample) %>%
+	group_by(BS_sample) %>% mutate(BS_ranks = rank(score)) %>%
+	ggplot(aes(factor(team,levels = levels(ranked_teams)), BS_ranks)) +
+	geom_violin(aes(fill=team),scale = "width",draw_quantiles = 0.5) + 
+	ggtitle("Subchallenge III: ranks over bootstrap samples") + 
+	geom_point(data = SC_leaderboard %>% filter(submitterId %in% ranked_teams), aes(submitterId,rank(score))) + 
+	theme_bw() +
+	xlab("teams") + 
+	ylab("ranks") + 
+	theme(axis.text.x = element_text(hjust=1,angle = 45))
+ggsave("./submission_analysis/figures/SCIII_score_bootstrap_ranks.pdf",width = 10,height = 6)
+
+
+
+# Compute the Bayes score based on the score: how many times teamA is better than 
+# teamB over the number of time the opposit happened: 
+compute_bayes_rank <- function(team_a,team_b,bootstrap_table){
+	team_a <- as.character(team_a)
+	team_b <- as.character(team_b)
+	sum(bootstrap_table[,team_a]<bootstrap_table[,team_b])/sum(bootstrap_table[,team_a]>bootstrap_table[,team_b])
+}
+
+
+Bayes_factors <- tibble(team_A = ranked_teams[-14], team_B = ranked_teams[-1]) %>%
+	rowwise() %>%
+	mutate(Bayes_factor = map2_dbl(team_A,team_B,compute_bayes_rank,bootstrap_stats))
+
+
+Bayes_factors %>% mutate(Bayes_factor = round(Bayes_factor,1),
+						 Bayes_factor = ifelse(
+						 	is.infinite(Bayes_factor),
+						 	">500",as.character(Bayes_factor))) %>%
+	write_tsv("./submission_analysis/figures/SCIII_bayes_factors.tsv",col_names = T)
