@@ -1,0 +1,232 @@
+---
+title: "Leaderboards for Subchallenge I"
+author: "Attila Gabor"
+date: "11/25/2019"
+output: BiocStyle::html_document
+---
+
+```{r setup, include=FALSE}
+
+library(RColorBrewer)
+library(tidyverse)
+library(ggplot2)
+library(ggrepel)
+
+source("../submission_analysis/utilities.R")
+
+colors  = brewer.pal(n = 8,"Dark2")
+
+```
+
+
+
+# Overview
+Here we report some statistics about subchallenge I and evaluate the leaderboard. 
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE, results=FALSE, echo=FALSE}
+
+LB_sc1 <- read_csv("../submission_data/final_round/leaderboard_all_rounds_sc1.csv") %>%
+	fix_leaderboard_raw() %>% filter(!is.na(round)) %>%
+	mutate(createdOn = fix_submission_dates(createdOn)) %>%
+	mutate(round = paste0("round_",round))
+LB_sc2 <- read_csv("../submission_data/final_round/leaderboard_all_rounds_sc2.csv") %>%
+	fix_leaderboard_raw() %>%  filter(!is.na(round)) %>%
+	mutate(createdOn = fix_submission_dates(createdOn)) %>%
+	mutate(round = paste0("round_",round))
+LB_sc3 <- read_csv("../submission_data/final_round/leaderboard_all_rounds_sc3.csv") %>%
+	fix_leaderboard_raw() %>%  filter(!is.na(round)) %>%
+	mutate(createdOn = fix_submission_dates(createdOn)) %>%
+	mutate(round = paste0("round_",round))
+LB_sc4 <- read_csv("../submission_data/final_round/leaderboard_all_rounds_sc4.csv") %>%
+	fix_leaderboard_raw() %>%  filter(!is.na(round)) %>%
+	mutate(createdOn = fix_submission_dates(createdOn)) %>%
+	mutate(round = paste0("round_",round))
+```
+
+Some statistics about challenge I: 
+```{r, echo=FALSE}
+# Statistics: 
+n_submissions <- LB_sc1 %>% filter(status== "SCORED") %>% nrow()
+#print(paste("# Total Submissions:",n_submissions))
+
+n_submission_by_round <- LB_sc1 %>% filter(status== "SCORED") %>% pull(round) %>% table()
+#print(paste("# Total Submissions per round:"))
+#print(n_submission_by_round)
+
+n_teams <- LB_sc1 %>% filter(status== "SCORED") %>% pull(submitterId)%>% unique() %>% length()
+#print(paste("# Teams:",n_teams))
+```
+- the number of total submissions: `r n_submissions`. 
+- the number of submissions per rounds
+	- round 1: `r n_submission_by_round[[1]]`
+	- round 2: `r n_submission_by_round[[2]]`
+	- round 3: `r n_submission_by_round[[3]]`
+- the number of teams participated in this sub challenge: `r n_teams`
+
+Submissions that are better then the reference models improved from round 1 to round 2, but not to final round. 
+
+```{r, echo=FALSE, warning=FALSE }
+### Subchallange I -------------------------------------------------------------
+#1.1 score distribution across rounds
+LB_sc1 %>% filter(status=="SCORED") %>% ggplot() + 
+	geom_rect(xmin=0.7, xmax=1.25, ymin=0, ymax=40, fill ="#F8F8CE",color="black")+
+	geom_histogram(aes(score),bins = 50, fill = colors[[1]]) + theme_bw() + 
+	ggtitle("Sub-challenge I: predict missing marker") +
+	ylab("# of submissions") + 
+	geom_vline(xintercept = 0.903103,color = colors[[2]],size=2) + 
+	geom_vline(xintercept = 3.992752,color = colors[[3]],size=2) + coord_cartesian(xlim = c(0,6)) + facet_grid( round~ .)
+
+LB_sc1 %>% filter(score<1.2) %>% ggplot() + geom_histogram(aes(score),bins = 40, fill = colors[[1]]) + theme_bw() + 
+	ggtitle("Sub-challenge I: predict missing marker") +
+	ylab("# of submissions") + 
+	geom_vline(xintercept = 0.903103,color = colors[[2]],size = 2) + 
+	xlim(0.7,1.25) + theme(panel.background = element_rect(fill = "#F8F8CE" ))  + facet_grid( round~ .)
+
+```
+
+
+
+# Leaderboards
+
+
+Next figure shows all the submissions. We report the scores of each team, 
+the y-axis is capped at 1.2 for better visualisation around the best teams. 
+We ordered the teams by their last submission as we agreed to rank them accordingly. 
+The shape of the points indicate in which round they submitted that predictions. 
+
+Some teams did not submit in the final rounds in some cases the final submissions were
+worst than the previous ones. 
+
+Here we go though the best teams as they are ranked on the figure. In all cases the write-ups need to be checked. 
+
+- The first place is clear
+- 2nd and 3rd positions: `NAD` and `@duct` is the same (NAD is the team, @duct is a member of the team)
+- `ajay_scic` and `Sleeping` scored very poorly in the final round
+- `Rhagave_india_SCS` didnt participate in the final round, but submitted write-up
+
+TODO: decide what to do with the teams that didnt submit in the final round. This 
+could influence the 3rd place. 
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+LB_sc1 %>% filter(status == "SCORED") %>% 
+	group_by(submitterId) %>%
+	mutate(latest = createdOn == createdOn[which.max(createdOn)] ) %>%
+	ungroup() %>%
+	mutate(submitterId = factor(submitterId,levels = filter(.,latest) %>%arrange(score) %>% pull(submitterId)))%>%
+	ggplot(aes(submitterId,score)) + 
+	geom_point(aes(color=latest,shape=round),size = 2) + 
+	theme_bw() + 
+	theme(axis.text.x = element_text(angle = 90,hjust = 1)) +
+	ggtitle("Submissions ordered by the latest score")
+
+LB_sc1 %>% filter(status == "SCORED") %>% 
+	group_by(submitterId) %>%
+	mutate(latest = createdOn == createdOn[which.max(createdOn)] ) %>%
+	ungroup() %>%
+	mutate(submitterId = factor(submitterId,levels = filter(.,latest) %>%arrange(score) %>% pull(submitterId)))%>%
+	ggplot(aes(submitterId,score)) + 
+	geom_point(aes(color=latest,shape=round),size = 2) + 
+	theme_bw() + 
+	theme(axis.text.x = element_text(angle = 90,hjust = 1)) +
+	ggtitle("Submissions ordered by the latest score (scores < 1.2)") + coord_cartesian(ylim = c(0.8,1.2))
+```
+
+## Strict leaderboard
+
+- only teams with submission to round 3
+- judging by their latest submission. 
+
+```{r paged.print=FALSE, echo=FALSE}
+LB_sc1 %>% filter(status == "SCORED",round == "round_3") %>% 
+	group_by(submitterId) %>%
+	mutate(latest = createdOn == createdOn[which.max(createdOn)] ) %>%
+	ungroup() %>%
+	mutate(submitterId = factor(submitterId,levels = filter(.,latest) %>%arrange(score) %>% pull(submitterId)))%>%
+	ggplot(aes(submitterId,score)) + 
+	geom_point(aes(color=latest,shape=round),size = 2) + 
+	theme_bw() + 
+	theme(axis.text.x = element_text(angle = 90,hjust = 1)) +
+	ggtitle("Submissions ordered by the latest score (scores < 1.2)") + coord_cartesian(ylim = c(0.8,1.2))
+
+
+LB_sc1 %>% filter(status == "SCORED",round == "round_3") %>% 
+	group_by(submitterId) %>%
+	mutate(latest = createdOn == createdOn[which.max(createdOn)] ) %>%
+	ungroup() %>%
+	filter(latest == TRUE) %>%
+	arrange(score) %>%
+	select(-objectId, -status, -FAILURE_REASON, -round,-latest) %>% print(.,n=23)
+```
+
+## Leaderboard based on best score
+
+- teams with any submission 
+- judging by the best score.
+
+
+```{r paged.print=FALSE, echo=FALSE}
+
+LB_sc1 %>% filter(status == "SCORED") %>% 
+	group_by(submitterId) %>%
+	top_n(-1, score) %>%
+	filter(!duplicated(submitterId)) %>%  # for duplicates
+	ungroup() %>%
+	arrange(score) %>%
+	mutate(submitterId = factor(submitterId,levels = arrange(.,score) %>% pull(submitterId)))%>%
+	ggplot(aes(submitterId,score)) + 
+	geom_point(aes(color=round, shape=round),size = 2) + 
+	theme_bw() + 
+	theme(axis.text.x = element_text(angle = 90,hjust = 1)) +
+	ggtitle("Submissions ordered by the best scores (scores < 1.2)") +
+	coord_cartesian(ylim = c(0.8,1.2))
+
+
+LB_sc1 %>% filter(status == "SCORED") %>% 
+	group_by(submitterId) %>%
+	top_n(-1, score) %>%
+	filter(!duplicated(submitterId)) %>%  # for duplicates
+	ungroup() %>%
+	arrange(score) %>%
+	select(-objectId, -status, -FAILURE_REASON) %>%
+	print(.,n=42)
+```
+
+
+## Leaderboard based on latest submission
+
+
+- teams with any submission 
+- judging by the latest score.
+
+
+```{r paged.print=FALSE, echo=FALSE}
+
+LB_sc1 %>% filter(status == "SCORED") %>% 
+	group_by(submitterId) %>%
+	mutate(latest = createdOn == createdOn[which.max(createdOn)] ) %>%
+	filter(latest) %>%
+	ungroup() %>%
+	arrange(score) %>%
+	mutate(submitterId = factor(submitterId,levels = arrange(.,score) %>% pull(submitterId)))%>%
+	ggplot(aes(submitterId,score)) + 
+	geom_point(aes(color=round, shape=round),size = 2) + 
+	theme_bw() + 
+	theme(axis.text.x = element_text(angle = 90,hjust = 1)) +
+	ggtitle("Submissions ordered by the best scores (scores < 1.2)") +
+	coord_cartesian(ylim = c(0.8,1.2))
+
+
+LB_sc1 %>% filter(status == "SCORED") %>% 
+	group_by(submitterId) %>%
+	mutate(latest = createdOn == createdOn[which.max(createdOn)] ) %>%
+	filter(latest) %>% 
+	ungroup() %>%
+	arrange(score) %>%
+	select(-objectId, -status, -FAILURE_REASON) %>%
+	print(.,n=42)
+```
+
+
+
+

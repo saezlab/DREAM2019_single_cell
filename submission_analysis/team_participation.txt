@@ -1,0 +1,387 @@
+, , submitterId = @anand_1812
+
+   round
+sc  round_1 round_2 round_3
+  1       0       2       0
+  2       0       0       0
+  3       0       0       0
+  4       0       0       0
+
+, , submitterId = @chk
+
+   round
+sc  round_1 round_2 round_3
+  1       0       1       0
+  2       0       0       0
+  3       0       0       0
+  4       0       0       0
+
+, , submitterId = @DDigimon
+
+   round
+sc  round_1 round_2 round_3
+  1       0       1       0
+  2       0       0       0
+  3       0       0       0
+  4       0       0       0
+
+, , submitterId = @dreamskys
+
+   round
+sc  round_1 round_2 round_3
+  1       0       1       3
+  2       0       0       0
+  3       0       0       0
+  4       0       1       3
+
+, , submitterId = @duct
+
+   round
+sc  round_1 round_2 round_3
+  1       2       3       0
+  2       0       3       0
+  3       0       3       0
+  4       0       3       0
+
+, , submitterId = @GaoGao199694
+
+   round
+sc  round_1 round_2 round_3
+  1       3       2       0
+  2       2       0       0
+  3       1       3       0
+  4       1       3       3
+
+, , submitterId = @Huiyuan
+
+   round
+sc  round_1 round_2 round_3
+  1       0       2       3
+  2       0       2       2
+  3       0       1       2
+  4       0       1       2
+
+, , submitterId = @jamesxli
+
+   round
+sc  round_1 round_2 round_3
+  1       0       3       1
+  2       0       0       0
+  3       0       0       0
+  4       0       0       0
+
+, , submitterId = @Lingyi
+
+   round
+sc  round_1 round_2 round_3
+  1       1       0       0
+  2       0       0       0
+  3       0       0       0
+  4       0       0       0
+
+, , submitterId = @MLVK
+
+   round
+sc  round_1 round_2 round_3
+  1       0       0       0
+  2       0       0       0
+  3       0       0       0
+  4       0       2       2
+
+, , submitterId = @mostyrice
+
+   round
+sc  round_1 round_2 round_3
+  1       1       3       0
+  2       0       2       0
+  3       0       2       1
+  4       0       3       0
+
+, , submitterId = @msinkala
+
+   round
+sc  round_1 round_2 round_3
+  1       0       3       1
+  2       0       3       1
+  3       0       3       2
+  4       0       3       1
+
+, , submitterId = @pqiu
+
+   round
+sc  round_1 round_2 round_3
+  1       0       0       2
+  2       0       0       1
+  3       0       0       1
+  4       0       0       1
+
+, , submitterId = @terrance1597
+
+   round
+sc  round_1 round_2 round_3
+  1       0       1       0
+  2       0       0       0
+  3       0       0       0
+  4       0       0       0
+
+, , submitterId = @TW_No_1
+
+   round
+sc  round_1 round_2 round_3
+  1       0       2       0
+  2       0       0       0
+  3       0       0       0
+  4       0       0       0
+
+, , submitterId = @v.chung
+
+   round
+sc  round_1 round_2 round_3
+  1       0       0       0
+  2       0       0       1
+  3       0       0       0
+  4       0       0       0
+
+, , submitterId = @yuanfang.guan
+
+   round
+sc  round_1 round_2 round_3
+  1       0       3       0
+  2       0       1       0
+  3       0       0       0
+  4       0       0       0
+
+, , submitterId = ajay_scis
+
+   round
+sc  round_1 round_2 round_3
+  1       3       0       1
+  2       0       3       2
+  3       0       2       0
+  4       0       0       1
+
+, , submitterId = AMbeRland
+
+   round
+sc  round_1 round_2 round_3
+  1       0       3       1
+  2       0       2       2
+  3       0       1       1
+  4       0       1       1
+
+, , submitterId = Buffalo Bulls
+
+   round
+sc  round_1 round_2 round_3
+  1       1       0       0
+  2       0       1       0
+  3       0       0       0
+  4       0       0       0
+
+, , submitterId = CSBL
+
+   round
+sc  round_1 round_2 round_3
+  1       0       0       0
+  2       0       0       1
+  3       0       0       2
+  4       0       0       1
+
+, , submitterId = DeepDreamer
+
+   round
+sc  round_1 round_2 round_3
+  1       0       3       0
+  2       0       0       0
+  3       0       0       0
+  4       0       0       0
+
+, , submitterId = DUTeam
+
+   round
+sc  round_1 round_2 round_3
+  1       3       3       1
+  2       1       0       0
+  3       0       0       0
+  4       3       2       0
+
+, , submitterId = Fire_Lily
+
+   round
+sc  round_1 round_2 round_3
+  1       0       3       2
+  2       0       0       0
+  3       0       0       0
+  4       0       0       0
+
+, , submitterId = hipathia
+
+   round
+sc  round_1 round_2 round_3
+  1       1       1       2
+  2       0       2       1
+  3       0       3       1
+  4       0       1       1
+
+, , submitterId = hulab SCS
+
+   round
+sc  round_1 round_2 round_3
+  1       1       3       1
+  2       0       3       0
+  3       0       3       0
+  4       0       3       2
+
+, , submitterId = icx_bxai
+
+   round
+sc  round_1 round_2 round_3
+  1       2       3       1
+  2       3       3       1
+  3       3       3       1
+  4       3       3       1
+
+, , submitterId = IGIBml
+
+   round
+sc  round_1 round_2 round_3
+  1       0       3       1
+  2       0       0       0
+  3       0       0       0
+  4       0       0       0
+
+, , submitterId = INLAB_BS
+
+   round
+sc  round_1 round_2 round_3
+  1       0       1       2
+  2       0       0       0
+  3       0       0       0
+  4       0       0       0
+
+, , submitterId = KAUST_RSS
+
+   round
+sc  round_1 round_2 round_3
+  1       1       0       1
+  2       0       2       0
+  3       0       2       0
+  4       0       0       1
+
+, , submitterId = MacBookPro
+
+   round
+sc  round_1 round_2 round_3
+  1       1       1       0
+  2       1       3       0
+  3       0       2       1
+  4       0       3       1
+
+, , submitterId = NAD
+
+   round
+sc  round_1 round_2 round_3
+  1       0       0       1
+  2       0       0       3
+  3       0       0       3
+  4       0       0       1
+
+, , submitterId = orangeballs
+
+   round
+sc  round_1 round_2 round_3
+  1       3       0       1
+  2       3       2       1
+  3       1       3       1
+  4       3       3       1
+
+, , submitterId = Ostar
+
+   round
+sc  round_1 round_2 round_3
+  1       3       3       0
+  2       3       0       0
+  3       2       0       0
+  4       0       0       0
+
+, , submitterId = PaL
+
+   round
+sc  round_1 round_2 round_3
+  1       0       0       1
+  2       0       0       2
+  3       0       0       1
+  4       0       0       1
+
+, , submitterId = Raghava_India_SCS
+
+   round
+sc  round_1 round_2 round_3
+  1       2       2       0
+  2       0       3       1
+  3       0       2       0
+  4       0       2       0
+
+, , submitterId = SanGuo
+
+   round
+sc  round_1 round_2 round_3
+  1       1       1       2
+  2       1       1       1
+  3       1       2       1
+  4       1       1       1
+
+, , submitterId = SCG
+
+   round
+sc  round_1 round_2 round_3
+  1       0       0       1
+  2       0       3       1
+  3       0       0       0
+  4       0       0       0
+
+, , submitterId = SingleCellLand
+
+   round
+sc  round_1 round_2 round_3
+  1       0       1       1
+  2       0       0       0
+  3       0       0       0
+  4       0       0       0
+
+, , submitterId = Sleeping
+
+   round
+sc  round_1 round_2 round_3
+  1       3       1       1
+  2       0       3       1
+  3       0       0       0
+  4       0       3       1
+
+, , submitterId = TW_No_1_Team
+
+   round
+sc  round_1 round_2 round_3
+  1       0       0       4
+  2       0       0       0
+  3       0       0       0
+  4       0       0       1
+
+, , submitterId = WhatATeam_SCSBC
+
+   round
+sc  round_1 round_2 round_3
+  1       1       0       0
+  2       0       0       0
+  3       0       0       0
+  4       0       0       0
+
+, , submitterId = ZeroPage_SCS
+
+   round
+sc  round_1 round_2 round_3
+  1       0       0       0
+  2       0       0       0
+  3       0       0       0
+  4       2       3       2
+  
