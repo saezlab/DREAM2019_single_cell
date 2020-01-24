@@ -3,70 +3,48 @@
 # Combine different numbers of randomly selected submissions
 
 library(tidyverse)
+library(Biobase)
 
 setwd("~/Desktop/BQ internship/DREAM2019_single_cell")
 
-submission_folder <- "./submission_data/final/SC1"
-leader_board <- read_csv(file.path(submission_folder, "leaderboard_final_sc1.csv"))
+all_predictions <- readRDS("./submission_data/intermediate_data/sc1_all_predictions.rds")
 
-required_columns <- c("glob_cellID","cell_line", "treatment", "time", "cellID", "fileID", 
-                      "p.Akt.Ser473.", "p.ERK", "p.HER2", "p.PLCg2", "p.S6")
-reporters <- c("p.Akt.Ser473.", "p.ERK", "p.HER2", "p.PLCg2", "p.S6")
+leader_board <- read_csv("./submission_data/final/SC1/leaderboard_final_sc1.csv")
+submissions <- readRDS("./submission_data/intermediate_data/sc1_ranked_teams.rds") %>% as.character()
 
-# Score predictions if predictions and validation are already in long format.
-score_sc1_long_format <- function(prediction_data_long, validation_data_long) {
-  
-  combined_data <- validation_data_long %>%
-    full_join(prediction_data_long, by = c("glob_cellID","cell_line", "treatment", "time", "cellID", "fileID", "marker"))
-  
-  ### Calculate score --------------------
-  # calculate the RMSE for each condition
-  RMSE_cond <- combined_data %>%
-    group_by(cell_line, treatment, time, marker) %>%
-    summarise(RMSE = sqrt(sum((test - prediction)^2) / n()))
-  final_score <- mean(RMSE_cond$RMSE)
-  return(final_score)
-}
-
-validation_data <- read_csv("~/Seafile/validation_data/sc1gold.csv") %>% select(required_columns)
-validation_data_long <- validation_data %>% gather(marker, test, reporters)
-
-submissions <- pull(leader_board, objectId)
-
-# Read all predictions
-all_predictions <- lapply(submissions, function(x) {
-  read_csv(file.path(submission_folder,paste0(x, ".csv")))  %>%
-    select(required_columns) %>% 
-    add_column(subID =  x) %>% 
-    gather(marker,marker_value,reporters)
-})
+# Radnomly sample 1 submission by sampling scores from the leaderboard
+repeated_scores <- tibble("Sample_size" = rep(1, 100), "Iteration" = seq(1,100), 
+                         "Mean" = sample(leader_board$score, 100, replace = TRUE)) %>%
+  mutate(Median = Mean)
 
 # Perform sampling n_samples random submissions n_iter number of times
 # Score the combinations of the submission and keep track of the scores
-
-repeated_scores <- tibble("Sample_size" = NA, "Iteration" = NA, "Mean" = NA, "Median" = NA)
-
 for (n in 2:length(submissions)) {
   
   n_samples <- n
-  n_iter<- 10
+  n_iter<- 100
   
   for (j in 1:n_iter) {
-    print(j)
+    print(paste0("samples: :", n_samples, " iteration: ", j))
 
     # Select the sampled predictions
-    predictions_long <- bind_rows(sample(all_predictions, n_samples, replace = FALSE))
+    selected_submissions <- sample(submissions, n)
     
     # Get scores from the selected predictions
-    mean_score <- predictions_long  %>%
-      group_by(glob_cellID, cell_line, treatment, time, cellID, fileID, marker) %>%
-      summarise(prediction = mean(marker_value)) %>%
-      score_sc1_long_format(validation_data_long)
+    mean_score <- all_predictions %>% 
+      mutate(prediction = rowMeans(.[selected_submissions])) %>%
+      group_by(cell_line, treatment, time, marker) %>%
+      summarise(RMSE = sqrt(sum((standard - prediction)^2) / n())) %>%
+      pull(RMSE) %>%
+      mean()
     
-    median_score <- predictions_long  %>%
-      group_by(glob_cellID, cell_line, treatment, time, cellID, fileID, marker) %>%
-      summarise(prediction = median(marker_value)) %>%
-      score_sc1_long_format(validation_data_long)
+    # Combine the selected submissions by taking the median and score it
+    median_score <-  all_predictions %>% 
+      mutate(prediction = rowMedians(as.matrix(.[selected_submissions]))) %>%
+      group_by(cell_line, treatment, time, marker) %>%
+      summarise(RMSE = sqrt(sum((standard - prediction)^2) / n())) %>%
+      pull(RMSE) %>%
+      mean()
     
     repeated_scores <- repeated_scores %>% add_row("Sample_size" = n_samples, 
                                                    "Iteration" = j, 
@@ -108,7 +86,6 @@ scores %>%
         axis.text = element_text(size=13),
         title = element_text(size=15),
         legend.text = element_text(size=13))
-  
 
 scores %>%
   gather(model, score, Mean, Median) %>%
