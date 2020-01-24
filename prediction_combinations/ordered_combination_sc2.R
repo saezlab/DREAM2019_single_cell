@@ -8,52 +8,35 @@ setwd("~/Desktop/BQ internship/DREAM2019_single_cell")
 # Scoring function wtth input a tibble, not a csv file
 source("./scoring_scripts/score_sc2_noFile.R")
 
-submission_folder <- "./submission_data/final/SC2"
-leader_board <- read_csv(file.path(submission_folder, "leaderboard_final_sc2.csv"))  %>% 
-  arrange(score) %>% 
-  rownames_to_column(var ="rank")
+validation_data <- read_csv("./challenge_data/validation_data/sc2gold.csv") 
+leader_board <- read_csv("./submission_data/final/SC2/leaderboard_final_sc2.csv")
 
+# Submissions are ordered from best to worst team
+submissions <- readRDS("./submission_data/intermediate_data/sc2_ranked_teams.rds") %>% as.character()
 
-required_columns <- c('cell_line','treatment', 'time',
-                      'b.CATENIN', 'cleavedCas', 'CyclinB', 'GAPDH', 'IdU',
-                      'Ki.67', 'p.4EBP1', 'p.Akt.Ser473.', 'p.AKT.Thr308.',
-                      'p.AMPK', 'p.BTK', 'p.CREB', 'p.ERK', 'p.FAK', 'p.GSK3b',
-                      'p.H3', 'p.JNK', 'p.MAP2K3', 'p.MAPKAPK2',
-                      'p.MEK', 'p.MKK3.MKK6', 'p.MKK4', 'p.NFkB', 'p.p38',
-                      'p.p53', 'p.p90RSK', 'p.PDPK1', 'p.RB', 
-                      'p.S6', 'p.S6K', 'p.SMAD23', 'p.SRC', 'p.STAT1',
-                      'p.STAT3', 'p.STAT5') 
+# The predicted cells of the teams, nested so team-cell_line-Tr-Time-dataframe with predictions 
+nested_predictions <- readRDS("./submission_data/intermediate_data/sc2_all_predictions_nested.rds") %>%
+  ungroup()
 
-validation_data <- read_csv("~/Seafile/validation_data/sc2gold.csv") %>% select(required_columns)
-
-submissions <- pull(leader_board, objectId)
-
-# Read all predictions
-all_predictions <- lapply(submissions, function(x) {
-  read_csv(file.path(submission_folder,paste0(x, ".csv")))  %>%
-    select(required_columns) %>% 
-    add_column(subID =  x)
-})
-
+# Select the top teams, combine their predictions by taking the mean or median and scoring it
+# Keeping track of the scores
 all_scores <- tibble("n"=NA, "Equal_sample" = NA)
 for (i in 1:length(submissions)) {
-  print(i)
+  print(paste0(i, " out of ", length(submissions)))
   
-  selected_subs <- all_predictions[1:i]
+  selected_subs <- submissions[1:i]
   
-  equal_sample_size <- lapply(selected_subs, function(x) {x %>% 
-      group_by(cell_line, treatment, time) %>%  sample_frac(1/i)}) %>%
-    bind_rows() %>%
-    select(required_columns) %>%
+  equal_sample_size <- nested_predictions %>%
+    filter(team %in% selected_subs) %>%
+    mutate(sample = map(data, ~sample_frac(., 1/i))) %>%
+    select(-c(data, team)) %>%
+    unnest(sample) %>%
     score_sc2(validation_data)
-  
-  print(equal_sample_size)
   
   all_scores <- all_scores %>%
     add_row(n = i,
             Equal_sample = equal_sample_size)
   
 }
-
 all_scores <- all_scores %>% filter(!is.na(n))
 saveRDS(all_scores, "prediction_combinations/SC2/SC2_ordered_combination.rds")
