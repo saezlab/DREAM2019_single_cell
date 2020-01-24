@@ -6,91 +6,46 @@ library(tidyverse)
 
 setwd("~/Desktop/BQ internship/DREAM2019_single_cell")
 
-# Scoring function wtth input a tibble, not a csv file
-source("./scoring_scripts/score_sc4_noFile.R")
+# The predictions of each team are a column, one column per team
+# The column standard is the goldesn standard/true value
+all_predictions <- readRDS("./submission_data/intermediate_data/sc4_combined_data.rds")
 
-submission_folder <- "./submission_data/final/SC4"
-leader_board <- read_csv(file.path(submission_folder, "leaderboard_final_sc4.csv"))
+leader_board <- read_csv("./submission_data/final/SC4/leaderboard_final_sc4.csv")
+submissions <- readRDS("./submission_data/intermediate_data/sc4_ranked_teams.rds") %>% 
+  as.character()
 
-required_columns <- c('cell_line','treatment', 'time',
-                      'b.CATENIN', 'cleavedCas', 'CyclinB', 'GAPDH', 'IdU',
-                      'Ki.67', 'p.4EBP1', 'p.Akt.Ser473.', 'p.AKT.Thr308.',
-                      'p.AMPK', 'p.BTK', 'p.CREB', 'p.ERK', 'p.FAK', 'p.GSK3b',
-                      'p.H3', 'p.JNK', 'p.MAP2K3', 'p.MAPKAPK2',
-                      'p.MEK', 'p.MKK3.MKK6', 'p.MKK4', 'p.NFkB', 'p.p38',
-                      'p.p53', 'p.p90RSK', 'p.PDPK1', 'p.RB', 
-                      'p.S6', 'p.S6K', 'p.SMAD23', 'p.SRC', 'p.STAT1',
-                      'p.STAT3', 'p.STAT5') 
-
-# Score predictions if predictions and validation are already in long format.
-score_sc4_long_format <- function(prediction_data_long, validation_data) {
-  
-  validation_data_long <- validation_data %>% gather(marker,test,-cell_line, -treatment, -time )
-  combined_data = full_join(prediction_data_long,
-                            validation_data_long,
-                            by=c("cell_line", "treatment", "time","marker"))
-  
-  ### Calculate score --------------------
-  # calculate the  distance over all stats
-  RMSE_cond = combined_data %>% group_by(cell_line,treatment,marker) %>% 
-    summarise(RMSE = sqrt(sum((test - prediction)^2)/n())) 
-  
-  final_score = mean(RMSE_cond$RMSE)
-}
-validation_data <- read_csv("~/Seafile/validation_data/sc4gold.csv") %>% select(required_columns)
-
-submissions <- list.files(submission_folder) 
-submissions <- submissions[!startsWith(submissions, "leaderboard")]
-
-# Read all predictions
-all_predictions <- lapply(submissions, function(x) {
-  read_csv(file.path(submission_folder,x))  %>%
-    select(required_columns) %>% 
-    add_column(subID = as.numeric(sub(".csv", "", x)))
-})
+# Radnomly sample 1 submission by sampling scores from the leaderboard
+repeated_scores <- tibble("Sample_size" = rep(1, 100), "Iteration" = seq(1,100), 
+                          "Mean" = sample(leader_board$score, 100, replace = TRUE)) %>%
+  mutate(Median = Mean)
 
 # Perform sampling n_samples random submissions n_iter number of times
 # Score the combinations of the submission and keep track of the scores
-
-repeated_scores <- tibble("Sample_size" = NA, "Iteration" = NA, "Mean" = NA, "Median" = NA)
-
 for (n in 2:length(submissions)) {
 
   n_samples <- n
-  n_iter<- 10
+  n_iter<- 100
 
   for (j in 1:n_iter) {
-    print(j)
-
+    print(paste0("samples: :", n_samples, " iteration: ", j))
+   
     # Select the sampled predictions
-    predictions <- bind_rows(sample(all_predictions, n_samples, replace = FALSE))
+    selected_submissions <- sample(submissions, n_samples)
     
-    predictions_long <- predictions %>% 
-      gather(marker,marker_value,-cell_line, -treatment, -time, -subID)
+    # Combine the selected submissions by taking the mean or median and score it
+    mean_score <- all_predictions %>% 
+      mutate(prediction = rowMeans(.[selected_submissions])) %>%
+      group_by(cell_line,treatment,marker) %>% 
+      summarise(RMSE = sqrt(sum((standard - prediction)^2)/n())) %>%
+      pull(RMSE) %>%
+      mean()  
     
-    # Get scores from the selected predictions 
-    scores <- leader_board %>%
-      filter(objectId %in% predictions$subID)  %>%
-      rename(subID = objectId) %>%
-      select(subID, score)
-    
-    mean_score <- predictions_long  %>%
-      group_by(cell_line, treatment, time, marker) %>%
-      summarise(prediction = mean(marker_value)) %>%
-      score_sc4_long_format(validation_data)
-    
-    median_score <- predictions_long  %>%
-      group_by(cell_line, treatment, time, marker) %>%
-      summarise(prediction = median(marker_value)) %>%
-      score_sc4_long_format(validation_data)
-  
-    all_scores <- scores %>% 
-      rename(model = subID) %>%
-      add_row(model = c("Mean", "Median"), 
-              score = c(mean_score, median_score)) %>%
-      select(model, score) %>%
-      arrange(score)
-    print(all_scores)
+    median_score <- all_predictions %>% 
+      mutate(prediction = rowMedians(as.matrix(.[selected_submissions]))) %>%
+      group_by(cell_line,treatment,marker) %>% 
+      summarise(RMSE = sqrt(sum((standard - prediction)^2)/n())) %>%
+      pull(RMSE) %>%
+      mean()  
     
     repeated_scores <- repeated_scores %>% add_row("Sample_size" = n_samples, 
                                                    "Iteration" = j, 
