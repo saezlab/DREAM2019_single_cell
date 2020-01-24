@@ -16,15 +16,14 @@ submissions <- readRDS("./submission_data/intermediate_data/sc4_ranked_teams.rds
 
 # Radnomly sample 1 submission by sampling scores from the leaderboard
 repeated_scores <- tibble("Sample_size" = rep(1, 100), "Iteration" = seq(1,100), 
-                          "Mean" = sample(leader_board$score, 100, replace = TRUE)) %>%
-  mutate(Median = Mean)
+                          "Median" = sample(leader_board$score, 100, replace = TRUE))
 
 # Perform sampling n_samples random submissions n_iter number of times
 # Score the combinations of the submission and keep track of the scores
 for (n in 2:length(submissions)) {
 
   n_samples <- n
-  n_iter<- 100
+  n_iter<- 10
 
   for (j in 1:n_iter) {
     print(paste0("samples: :", n_samples, " iteration: ", j))
@@ -32,14 +31,7 @@ for (n in 2:length(submissions)) {
     # Select the sampled predictions
     selected_submissions <- sample(submissions, n_samples)
     
-    # Combine the selected submissions by taking the mean or median and score it
-    mean_score <- all_predictions %>% 
-      mutate(prediction = rowMeans(.[selected_submissions])) %>%
-      group_by(cell_line,treatment,marker) %>% 
-      summarise(RMSE = sqrt(sum((standard - prediction)^2)/n())) %>%
-      pull(RMSE) %>%
-      mean()  
-    
+    # Combine the selected submissions by taking the median and score it
     median_score <- all_predictions %>% 
       mutate(prediction = rowMedians(as.matrix(.[selected_submissions]))) %>%
       group_by(cell_line,treatment,marker) %>% 
@@ -49,14 +41,10 @@ for (n in 2:length(submissions)) {
     
     repeated_scores <- repeated_scores %>% add_row("Sample_size" = n_samples, 
                                                    "Iteration" = j, 
-                                                   "Mean" = mean_score, 
                                                    "Median" = median_score)
   }
   
 }
-repeated_scores <- filter(repeated_scores, !is.na(Sample_size))
-#colnames(repeated_scores) <- c("Mean", "Median", "Weighted")
-#repeated_scores <- repeated_scores %>% as_tibble()
 
 if (FALSE) {saveRDS(repeated_scores, "prediction_combinations/SC4/SC4_random_subs_scores.rds")}
 
