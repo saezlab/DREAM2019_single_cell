@@ -7,6 +7,8 @@ library(Biobase)
 
 setwd("~/Desktop/BQ internship/DREAM2019_single_cell")
 
+# The predictions of each team are a column, one column per team
+# Thecolumn standard is the goldesn standard/true value
 all_predictions <- readRDS("./submission_data/intermediate_data/sc1_all_predictions.rds")
 
 leader_board <- read_csv("./submission_data/final/SC1/leaderboard_final_sc1.csv")
@@ -27,7 +29,7 @@ for (n in 2:length(submissions)) {
     print(paste0("samples: :", n_samples, " iteration: ", j))
 
     # Select the sampled predictions
-    selected_submissions <- sample(submissions, n)
+    selected_submissions <- sample(submissions, n_samples)
 
     # Combine the selected submissions by taking the median and score it
     median_score <-  all_predictions %>% 
@@ -43,7 +45,7 @@ for (n in 2:length(submissions)) {
   }
   
 }
-repeated_scores <- filter(repeated_scores, !is.na(Sample_size))
+
 #colnames(repeated_scores) <- c("Mean", "Median", "Weighted")
 #repeated_scores <- repeated_scores %>% as_tibble()
 if (FALSE) {saveRDS(repeated_scores, "prediction_combinations/SC1/SC1_random_subs_scores.rds")}
