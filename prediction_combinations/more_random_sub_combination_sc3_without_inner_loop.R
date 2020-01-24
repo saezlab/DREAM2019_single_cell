@@ -1,6 +1,6 @@
 ## SC3; without inner loop
-# Combine predictions from ramdomly selected submissions
-# Combine different numbers of randomly selected submissions
+# Combine predictions from different number of ramdomly selected submissions
+# Combining by sampling cells equally from the selected submissions
 
 library(dplyr)
 library(readr)
@@ -23,7 +23,9 @@ required_columns <- c('cell_line','treatment', 'time',
                       'p.S6', 'p.S6K', 'p.SMAD23', 'p.SRC', 'p.STAT1',
                       'p.STAT3', 'p.STAT5') 
 
-validation_data <- read_csv("~/Seafile/validation_data/sc3gold.csv") 
+validation_data <- read_csv("./challenge_data/validation_data/sc3gold.csv") 
+
+# Calculate statisctics necessary for scoring the subchallenge
 validation_stats <- validation_data  %>% 
   select(required_columns) %>%
   data_to_stats() %>% 
@@ -31,19 +33,23 @@ validation_stats <- validation_data  %>%
   arrange(cell_line, treatment, time, stat_variable) %>%
   ungroup() %>%
   select(test_stat_value)
+
 submission_folder <- "./submission_data/final/SC3"
 leader_board <- read_csv(file.path(submission_folder, "leaderboard_final_sc3.csv"))
+
+# The predicted cells of the teams, nested so team-cell_line-Tr-Time-dataframe with predictions 
 nested_predictions <- readRDS("./submission_data/intermediate_data/sc3_all_predictions_nested.rds") %>%
   ungroup()
 
-repeated_scores <- tibble("Sample_size" = NA, "Iteration" = NA, "Equal_sample" = NA)
+# Radnomly sample 1 submission by sampling scores from the leaderboard
+repeated_scores <- tibble("Sample_size" = rep(1, 100), "Iteration" = seq(1,100), 
+                          "Equal_sample" = sample(leader_board$score, 100, replace = TRUE))
+
+# Perform sampling n submission randomly, n_iter number of times
+# Score the combinations of the submission and keep track of the scores
 for (n in 1:dim(leader_board)[1]) {
   n_samples <- n
   n_iter<- 100
-  
-  # Perform sampling n_samples random submissions n_iter number of times
-  # Each combination of sumbmissions is combined and scored ten times
-  # Because sampling can differ each time. All scores are saves
   
   for (j in 1:n_iter) {
     print(paste0("samples: ", n_samples, " iteration: ", j))
@@ -51,24 +57,22 @@ for (n in 1:dim(leader_board)[1]) {
     # Select the sampled predictions
     predictions <- sample(unique(nested_predictions$team), n_samples, replace = FALSE)
     
-    
+    # Combine by sampling equally from the selected submissions and score it
     equal_sample_size <- nested_predictions %>%
       filter(team %in% predictions) %>%
       mutate(sample = map(data, ~sample_frac(., 1/n_samples))) %>%
       select(-c(data, team)) %>%
       unnest(sample) %>%
       select(required_columns) %>%
-      data_to_stats() %>% 
+      data_to_stats() %>% # Get statistics of prediction nessecary for scoring
       rename(pred_stat_value = stat_value) %>%
-      arrange(cell_line, treatment, time, stat_variable) %>%
+      arrange(cell_line, treatment, time, stat_variable) %>% # Same order as validation stats
       ungroup() %>%
       bind_cols(validation_stats) %>%
       select(test_stat_value, pred_stat_value) %>%
       as.matrix() %>%
       t() %>%
       dist(method = "euclidean")
-    
-    print(equal_sample_size)
     
     repeated_scores <- repeated_scores %>%
       add_row(Sample_size = n, 
@@ -79,7 +83,6 @@ for (n in 1:dim(leader_board)[1]) {
   
 }
 
-repeated_scores <- filter(repeated_scores, !is.na(Sample_size))
 
 if (FALSE) {saveRDS(repeated_scores, "prediction_combinations/SC3/SC3_random_subs_scores.rds")}
 
