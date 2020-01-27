@@ -56,6 +56,7 @@ sub_data_err <- sub_data_err %>%
                           time==18 ~ 17,
                           TRUE ~ time))
 sub_data_median <- readRDS("./submission_data/intermediate_data/sc1_median_conditions.rds") %>%
+  ungroup() %>%
   mutate(time = case_when(time==14 ~ 13,
                           time==18 ~ 17,
                           TRUE ~ time))
