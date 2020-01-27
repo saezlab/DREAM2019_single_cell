@@ -46,6 +46,7 @@ all_median <- all_cell_line_data  %>%
 #saveRDS(all_median, "./submission_data/intermediate_data/sc1_median_non_predicted.rds")
 
 ## Load the predictions./submissions of the teams add the column best_sub and edit the time-point
+# dataframe are organised with a column for each team and standard for the golden standard
 submissions <-  readRDS("./submission_data/intermediate_data/sc1_ranked_teams.rds") %>%
   as.character()
 sub_data_err <- readRDS("./submission_data/intermediate_data/sc1_rmse_conditions.rds")
@@ -104,6 +105,8 @@ sub_data_values <- readRDS("./submission_data/intermediate_data/sc2_stats_condit
   mutate(stat_variable = sub("v_","v-", stat_variable),
          stat_variable = sub("n_","n-", stat_variable)) %>%
   mutate(time=ifelse(time==16, 17, time))
+sub_data_nested <- readRDS("./submission_data/intermediate_data/sc2_all_predictions_nested.rds") %>%
+  mutate(time=ifelse(time==16, 17, time)) # Edit rare timepoints
 
 cell_lines <- unique(sub_data_values$cell_line)
 
@@ -138,6 +141,7 @@ values_median_EGF0 <- sub_data_values %>%
 # Save the dataframes to be used in training the models
 saveRDS(err_median_EGF, "./submission_data/intermediate_data/sc2_err_median_EGF0.rds")
 saveRDS(values_median_EGF0, "./submission_data/intermediate_data/sc2_values_median_EGF0.rds")
+saveRDS(sub_data_nested, "./submission_data/intermediate_data/sc2_all_predictions_nested.rds")
   
 ### ------------------------------------- SC3 --------------------------------------
 ## Add median marker values at treatment EGF0, timepoint 0
@@ -165,6 +169,10 @@ sub_data_err <- sub_data_err %>%
 sub_data_values <- readRDS("./submission_data/intermediate_data/sc3_stats_conditions.rds") %>%
   mutate(stat_variable = sub("v_","v-", stat_variable),
          stat_variable = sub("n_","n-", stat_variable)) %>%
+  mutate(time=case_when(time == 14 ~13,
+                        time == 16 ~ 17,
+                        TRUE ~ time))
+sub_data_nested <- readRDS("./submission_data/intermediate_data/sc3_all_predictions_nested.rds") %>%
   mutate(time=case_when(time == 14 ~13,
                         time == 16 ~ 17,
                         TRUE ~ time))
@@ -200,7 +208,7 @@ values_median_EGF0 <- sub_data_values %>%
 # Save the dataframes to be used in training the models
 saveRDS(err_median_EGF, "./submission_data/intermediate_data/sc3_err_median_EGF0.rds")
 saveRDS(values_median_EGF0, "./submission_data/intermediate_data/sc3_values_median_EGF0.rds")
-
+saveRDS(sub_data_nested, "./submission_data/intermediate_data/sc3_all_predictions_nested.rds")
 
 
 ### -------------------------------------------- SC4 -------------------------------------
