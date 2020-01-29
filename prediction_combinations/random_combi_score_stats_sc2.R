@@ -1,6 +1,8 @@
 ## SC2; without inner loop
 # Combine predictions from different number of ramdomly selected submissions
 # Combining by sampling cells equally from the selected submissions
+# Since we observed that random sampleing 1 or a few submissions performs better than sampling more
+# Here we investigate if the covariance get worse when combining submissions causing this phenomenon
 
 library(dplyr)
 library(readr)
