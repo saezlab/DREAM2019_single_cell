@@ -63,14 +63,17 @@ feature_count <- tibble("feature" = c("treatment", "time", np_markers),
 # Keep track of scores per CV loop
 scores <- tibble("CV_loop" = NA, 
                  "val_CL" =NA,
-                 "MDT" = NA, 
+                 "MDT" = NA,
                  "arbiter" = NA,
                  "lc_arbiter" = NA,
                  "lm" = NA,
-                 "single" = NA,)
+                 "stats_RF" = NA,
+                 "stats_lc_arbiter" = NA,
+                 "single" = NA)
 
-# Save predictions made by each model
+# Save predictions and SSQ errors made by each model
 all_predictions <- tibble()
+all_SSQ <- tibble()
 # Every loop two cell lines are used as validation, each cell line occurs as validation once
 for (i in seq(1, by=4, len= 0.25*length(cell_lines))) {
   print(paste("Iteration", ceiling(i/4), sep = " "))
@@ -117,6 +120,9 @@ for (i in seq(1, by=4, len= 0.25*length(cell_lines))) {
   lm_formula <- paste0("standard ~", paste(submissions, collapse = "+"))
   linModel <- lm(lm_formula, data=train_data_value)
   
+  # Random forest trained on statistics of the predictions
+  stats_RF <- ranger(lm_formula, data=train_data_value, importance = "impurity")
+  
   # Select best single model
   single_model_scores <- train_data_err %>%
     select(submissions) %>%
@@ -127,62 +133,126 @@ for (i in seq(1, by=4, len= 0.25*length(cell_lines))) {
   
   ## Assess model performances
   # Select for each condition the value of the MDT estimated best predictor and score the submission
-  MDT_pred <-  val_data_err %>% 
+ MDT_pred_best_team <-  val_data_err %>% 
     add_column(pred = predict(MDT, val_data_err, type = "class")) %>%
-    gather(team, SSQ, submissions) %>%
-    filter(pred==team) %>%
-    rename(MDT_SSQ = SSQ) %>%
+    gather(team, MDT_SSQ, submissions) %>%
+    filter(pred==team)
+  
+  MDT_pred <- MDT_pred_best_team %>%
+    select(cell_line, treatment, time, team) %>%
+    left_join(nested_predictions) %>%
+    add_column(model="MDT", .before = "cell_line") %>%
+    select(-team) %>%
+    rename(prediction = data)
+  
+  MDT_SSQ <- MDT_pred_best_team %>%
     select(cell_line, treatment, time, MDT_SSQ)
-
-  MDT_val_score <-MDT_pred %>%
+  
+  MDT_val_score <-MDT_SSQ %>%
     select(MDT_SSQ) %>%
     colSums() %>%
     sqrt()
+  
   # Predict error of each submission on the validation data with the arbiter
   arbiter_pred <- lapply(arbiter, FUN = function(a) {predict(a, val_data_err)})   %>% as_tibble()
   
   # Select submission with lowest predicted error and score the combination
-  arbiter_pred_value <- val_data_err %>%
+  arbiter_pred_best_team <- val_data_err %>%
     add_column(pred = names(arbiter_pred)[max.col(-arbiter_pred)]) %>%
-    gather(team, SSQ, submissions) %>%
-    filter(pred==team)  %>%
-    rename(arbiter_SSQ = SSQ) %>%
+    gather(team, arbiter_SSQ, submissions) %>%
+    filter(pred==team) 
+  
+  arbiter_pred_cells <- arbiter_pred_best_team %>%
+    select(cell_line, treatment, time, team) %>%
+    left_join(nested_predictions) %>%
+    add_column(model = "arbiter", .before =  "cell_line") %>%
+    select(-team) %>%
+    rename(prediction = data)
+  
+  arbiter_SSQ <- arbiter_pred_best_team %>%
     select(cell_line, treatment, time, arbiter_SSQ)
   
-  arbiter_val_score <- arbiter_pred_value %>%
+  arbiter_val_score <- arbiter_SSQ %>%
     select(arbiter_SSQ) %>%
     colSums() %>%
     sqrt()
+  
   
   # Linear combination of prediction based on predicted error by the arbiter W is the weights
   W <- lapply(arbiter_pred, function(v) {(1/rowSums(arbiter_pred)/v)}) %>% as_tibble()
   W <- lapply(W, function(x){x/rowSums(W)}) %>% as_tibble()
   lc_arbiter_pred <- val_data_err %>% 
-    select(-c(submissions, best_sub)) %>%
+    select(-c(submissions, best_sub, np_markers)) %>%
     bind_cols(W) %>%
     mutate(time=as.numeric(time)) %>%
     gather(team, weight, submissions) %>%
     left_join(nested_predictions) %>%
     mutate(sample = map2(data, weight, sample_frac)) %>%
-    select(cell_line, treatment, time, sample) %>% 
-    unnest() %>%
+    select(cell_line, treatment, time, sample) %>%
+    add_column(model  = "lc_arbiter", .before = "cell_line") %>%
+    unnest(sample) %>%
+    group_by(model, cell_line, treatment, time) %>%
+    nest(prediction = -group_cols()) %>%
+    ungroup()
+  
+  lc_arbiter_SSQ <- lc_arbiter_pred  %>% 
+    select(-model) %>%
+    unnest(prediction) %>%
     data_to_stats() %>%
     rename(pred_stat_value = stat_value) %>%
     arrange(cell_line, treatment, time, stat_variable) %>%
-    bind_cols(select(val_data_value, standard))  %>%
+    bind_cols(select(val_data_value, standard)) %>%
     select(cell_line, treatment, time, stat_variable, standard, pred_stat_value) %>%
     group_by(cell_line, treatment, time) %>%
     summarise(lc_arbiter_SSQ = sum((standard - pred_stat_value)^2)) %>%
     ungroup()
   
-  lc_arbiter_val_score <- lc_arbiter_pred %>%
+  lc_arbiter_val_score <- lc_arbiter_SSQ %>%
     select(lc_arbiter_SSQ) %>%
     colSums() %>%
     sqrt()
   
+  # Combine predicted error of arbiter on statistics level, make MVN and sample 10,000 cells
+  val_data_long <- val_data_value %>%
+    select(cell_line, treatment, time, stat_variable, submissions) %>%
+    gather(team, pred_stat, submissions) 
+  
+  stats_lc_arbiter_pred <- val_data_err %>% 
+    select(-c(submissions, best_sub, np_markers)) %>%
+    bind_cols(W) %>%
+    gather(team, weight, submissions) %>%
+    right_join(val_data_long) %>%
+    group_by(cell_line, treatment, time, stat_variable) %>%
+    summarise(prediction = sum(weight*pred_stat))  %>%
+    separate(stat_variable, into = c("stat", "variable"),sep="-") %>%
+    group_by(cell_line, treatment, time, stat) %>%
+    nest(stat_values = c(variable, prediction)) %>%
+    pivot_wider(names_from = stat, values_from = stat_values) %>%
+    mutate(full_cov = map(cov, makeSymm),
+           full_mean = map(mean, ~pull(., prediction))) %>%
+    mutate(prediction = map2(full_mean, full_cov, sample_MVN)) %>%
+    select(cell_line, treatment, time, prediction)  %>%
+    add_column(model="stats_lc_arbiter", .before = "cell_line")
+  
+  stats_lc_arbiter_SSQ <- stats_lc_arbiter_pred %>%
+    select(-model) %>%
+    unnest(prediction) %>%
+    data_to_stats() %>%
+    rename(pred_stat_value = stat_value) %>%
+    arrange(cell_line, treatment, time, stat_variable) %>%
+    bind_cols(select(val_data_value, standard)) %>%
+    select(cell_line, treatment, time, stat_variable, standard, pred_stat_value) %>%
+    group_by(cell_line, treatment, time) %>%
+    summarise(stats_arbiter_SSQ = sum((standard - pred_stat_value)^2)) %>%
+    ungroup()
+  
+  stats_lc_arbiter_score <- stats_lc_arbiter_SSQ %>%
+    select(stats_arbiter_SSQ) %>%
+    colSums() %>%
+    sqrt()
   
   # Linear model
-  lm_pred <-val_data_value %>% 
+  lm_pred <- val_data_value %>% 
     add_column(prediction = predict(linModel, val_data_value)) %>%
     select(cell_line, treatment, time, stat_variable, prediction) %>%
     separate(stat_variable, into = c("stat", "variable"),sep="-") %>%
@@ -193,39 +263,84 @@ for (i in seq(1, by=4, len= 0.25*length(cell_lines))) {
            full_mean = map(mean, ~pull(., prediction))) %>%
     mutate(prediction = map2(full_mean, full_cov, sample_MVN)) %>%
     select(cell_line, treatment, time, prediction) %>%
-    unnest(prediction)%>%
+    add_column(model="lm", .before = "cell_line")
+  
+  lm_SSQ <- lm_pred %>%
+    select(-model) %>%
+    unnest(prediction) %>%
     data_to_stats() %>%
     rename(pred_stat_value = stat_value) %>%
     arrange(cell_line, treatment, time, stat_variable) %>%
-    bind_cols(select(val_data_value, standard))%>%
+    bind_cols(select(val_data_value, standard)) %>%
     select(cell_line, treatment, time, stat_variable, standard, pred_stat_value) %>%
     group_by(cell_line, treatment, time) %>%
     summarise(lm_SSQ = sum((standard - pred_stat_value)^2)) %>%
     ungroup() 
   
-  lm_val_score <- lm_pred %>%
+  lm_val_score <- lm_SSQ %>%
     select(lm_SSQ) %>%
     colSums() %>%
     sqrt()
   
+  # Random Forest: Combine the submissions on statistical level, create MVN and sample 10,000 cells w
+  stats_RF_pred <- val_data_value %>% 
+    add_column(prediction = predict(stats_RF, val_data_value)$predictions) %>%
+    select(cell_line, treatment, time, stat_variable, prediction) %>%
+    separate(stat_variable, into = c("stat", "variable"),sep="-") %>%
+    group_by(cell_line, treatment, time, stat) %>%
+    nest(stat_values = c(variable, prediction)) %>%
+    pivot_wider(names_from = stat, values_from = stat_values) %>%
+    mutate(full_cov = map(cov, makeSymm),
+           full_mean = map(mean, ~pull(., prediction))) %>%
+    mutate(prediction = map2(full_mean, full_cov, sample_MVN)) %>%
+    select(cell_line, treatment, time, prediction) %>%
+    add_column(model="stats_RF", .before = "cell_line")
+  
+  stats_RF_SSQ <- stats_RF_pred %>%
+    select(-model) %>%
+    unnest(prediction) %>%
+    data_to_stats() %>%
+    rename(pred_stat_value = stat_value) %>%
+    arrange(cell_line, treatment, time, stat_variable) %>%
+    bind_cols(select(val_data_value, standard)) %>%
+    select(cell_line, treatment, time, stat_variable, standard, pred_stat_value) %>%
+    group_by(cell_line, treatment, time) %>%
+    summarise(stats_RF_SSQ = sum((standard - pred_stat_value)^2)) %>%
+    ungroup()
+  
+  stats_RF_score <- stats_RF_SSQ %>%
+    select(stats_RF_SSQ) %>%
+    colSums() %>%
+    sqrt()
+  
   # Score predictions of single best model 
-  SB_pred <- val_data_err %>%
+  SB_pred <- nested_predictions %>%
+    filter(team == single_best) %>%
+    right_join(select(val_data_err, cell_line, treatment, time)) %>%
+    add_column(model = "single best", .before = "team") %>%
+    select(-team) %>%
+    rename(prediction = data)
+  
+  SB_SSQ <- val_data_err %>%
     select(cell_line, treatment, time, single_best) %>%
     rename(SB_SSQ = single_best) 
   
-  SB_val_score <- SB_pred %>%
+  SB_val_score <- SB_SSQ %>%
     select(SB_SSQ) %>%
     colSums() %>%
     sqrt()
   
   ## Update score table 
   scores <- scores %>% add_row("CV_loop" = i, 
-                               "val_CL" = paste(cell_lines[i:j], collapse = "_"),
+                               "val_CL" = paste(cell_lines[i:(i+3)], collapse = "_"),
                                "MDT" = MDT_val_score, 
                                "arbiter" = arbiter_val_score,
                                "lc_arbiter" = lc_arbiter_val_score,
                                "lm" = lm_val_score,
+                               "stats_RF" = stats_RF_score,
+                               "stats_lc_arbiter" = stats_lc_arbiter_score,
                                "single" = SB_val_score)
+  
   
   ## Count selected features by MDT and arbiter
   MDT_features <- unique(sub("[<>=].*", "", labels(MDT))) %>% 
@@ -242,18 +357,23 @@ for (i in seq(1, by=4, len= 0.25*length(cell_lines))) {
            count = count+count_MDT+n) %>%
     select(feature, count)
   
-  # Save all predictions
-  predictions <- plyr::join_all(list(MDT_pred, arbiter_pred_value, lc_arbiter_pred, lm_pred, SB_pred)) %>%
+  # Save all predictions and SSQs
+  all_predictions <- bind_rows(all_predictions, list(MDT_pred, arbiter_pred_cells, lc_arbiter_pred, stats_lc_arbiter_pred,
+                                                     lm_pred, stats_RF_pred ,SB_pred))
+  
+  SSQs <- plyr::join_all(list(MDT_SSQ, arbiter_SSQ, lc_arbiter_SSQ, stats_lc_arbiter_SSQ,
+                              lm_SSQ, stats_RF_SSQ ,SB_SSQ)) %>%
     as_tibble()
-  all_predictions <- bind_rows(all_predictions, predictions)
+  all_SSQ <- bind_rows(all_SSQ, SSQs)
 }
 
 scores <- filter(scores, !is.na(CV_loop))  
 
-if (TRUE) {
+if (FALSE) {
   saveRDS(scores, "./prediction_combinations/SC3/L4O_CV_scores.rds")
   saveRDS(feature_count, "./prediction_combinations/SC3/L4O_CV_feature_counts.rds")
   saveRDS(all_predictions, "./prediction_combinations/SC3/L4O_CV_all_prediction.rds")
+  saveRDS(all_SSQ, "./prediction_combinations/SC3/L4O_CV_all_SSQ.rds")
   
 }
 
@@ -293,4 +413,3 @@ CV_features  %>%
         title = element_text(size=15),
         legend.position = "none") +
   labs(y="proprtion selected", x="feature", title="SC3; leave 4 out CV")
-
