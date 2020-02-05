@@ -20,21 +20,21 @@ markers <- c('b.CATENIN', 'cleavedCas', 'CyclinB', 'GAPDH', 'IdU', 'Ki.67', 'p.4
              'p.p90RSK', 'p.PDPK1', 'p.RB', 'p.S6', 'p.S6K', 'p.SMAD23', 'p.SRC', 'p.STAT1', 'p.STAT3', 
              'p.STAT5')
 
-goldens_standard <- read_csv("~/Desktop/BQ internship/DREAM2019_single_cell/challenge_data/validation_data/sc2gold.csv")
+golden_standard <- read_csv("~/Desktop/BQ internship/DREAM2019_single_cell/challenge_data/validation_data/sc2gold.csv")
 
 CC_markers <- c("Ki.67", "CyclinB", "GAPDH", "IdU", "p.RB", "cleavedCas", "p.H3")
 
-GS_sub <- goldens_standard %>%
+GS_sub <- golden_standard %>%
   group_by(cell_line, treatment, time) %>%
   sample_frac(0.1) %>%
   ungroup() 
 
-conditions <- nested_predictions %>%
+conditions <- golden_standard %>%
   select(cell_line, treatment) %>%
   distinct()
 
 # Clustering and analysis per cell line-treatment condition for selected team
-# For this step team_sub is sampled 0.1 per team and condition
+# For this step GS_sub is sampled 0.1 per team and condition
 for (i in 1:dim(conditions)[1]){
   CL <- conditions$cell_line[i]
   TR <- conditions$treatment[i]
@@ -89,14 +89,14 @@ setwd("~/Desktop/BQ internship/DREAM2019_single_cell/heterogeneity_analysis/SC2"
 dir.create("all_conditions")
 setwd("./all_conditions")
 
-GS_sub <- goldens_standard %>%
+GS_sub <- golden_standard %>%
   group_by(cell_line, treatment, time) %>%
   sample_frac(0.01) %>%
   ungroup() 
 
 # Do UMAP dimensionslity reduction and apply hierarchical clustering per team
 # Clustering over all cell lines, treatments and timepoints
-# For this step team_sub is samples with 0.01 per team and condition
+# For this step GS_sub is samples with 0.01 per team and condition
 if (TRUE) {
   umap_eu_lin <- umap(as.matrix(select(GS_sub, CC_markers)), metric="euclidean", init="PCA",
                       n_components = 2, fast_sgd=TRUE, min_dist=0.1)
@@ -113,7 +113,7 @@ if (TRUE) {
   saveRDS(GS_clusters, "GS_sub_clustered.rds")
   
   pdf("GS_UMAP_HC_clust.pdf", height = 5, width = 5)
-  print(team_clusters %>%
+  print(GS_clusters %>%
           ggplot(aes(x=V1, y=V2, colour=umap_hc_clust)) +
           geom_point(size=0.1) +
           labs(x = "V1", y = "V2", title= "UMAP colored by HC on first 2 UMAP comps") +
