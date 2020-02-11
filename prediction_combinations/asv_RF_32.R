@@ -20,10 +20,7 @@ sub_data_all <- readRDS("./submission_data/intermediate_data/sc1_all_NP_predicti
   group_by(treatment, time, marker) %>%
   mutate(n=n()) %>%
   ungroup() %>%
-  mutate(n = ifelse(n<500, n, 500)) %>%
-  mutate(time = case_when(time==14 ~ 13,
-                          time==18 ~ 17,
-                          TRUE ~ time))
+  mutate(n = ifelse(n<500, n, 500))
 
 np_markers <- c("b.CATENIN", "cleavedCas", "CyclinB", "GAPDH", "IdU", "Ki.67", "p.4EBP1", 
                 "p.AKT.Thr308.", "p.AMPK", "p.BTK", "p.CREB", "p.FAK", "p.GSK3b", "p.H3", "p.JNK",
