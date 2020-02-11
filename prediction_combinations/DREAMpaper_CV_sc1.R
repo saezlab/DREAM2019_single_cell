@@ -7,7 +7,10 @@
 # RF directly predicts marker values with features Tr, Ti, Ma and the teams predictions
 # A linear model per Tr, Ti, Ma (condition) directly predicts marker values from the teams predictions
 
-library(tidyverse)
+library(tidyr)
+library(purrr)
+library(tibble)
+library(dplyr)
 library(ranger)
 
 setwd("~/Desktop/BQ internship/DREAM2019_single_cell")
@@ -21,15 +24,12 @@ sub_data_median <- readRDS("./submission_data/intermediate_data/sc1_median_condi
 sub_data_err <- readRDS( "./submission_data/intermediate_data/sc1_condErr_medianVals.rds")  %>%
   mutate_if(is.character, as.factor)
 # All single cell predictions of all teams and true values (standard) as well as 32 marker values of non predicted markers
-sub_data_all <- readRDS("./submission_data/intermediate_data/sc1_all_NP_predictions.rds")  %>%
+sub_data_all <- readRDS("./submission_data/intermediate_data/sc1_all_NP_predictions.rds") %>%
   mutate_if(is.character, as.factor) %>%
   group_by(treatment, time, marker) %>%
   mutate(n=n()) %>%
   ungroup() %>%
-  mutate(n = ifelse(n<500, n, 500)) %>%
-  mutate(time = case_when(time==14 ~ 13,
-                          time==18 ~ 17,
-                          TRUE ~ time))
+  mutate(n = ifelse(n<500, n, 500)) 
 
 np_markers <- c("b.CATENIN", "cleavedCas", "CyclinB", "GAPDH", "IdU", "Ki.67", "p.4EBP1", 
                 "p.AKT.Thr308.", "p.AMPK", "p.BTK", "p.CREB", "p.FAK", "p.GSK3b", "p.H3", "p.JNK",
@@ -50,11 +50,11 @@ scores <- tibble("CV_loop" = NA,
                  "cond_RF" = NA,
                  "RF" = NA)
 
-# Save predicted values 
-all_predictions <- tibble()
+# Save errors of all predictions made by each model
+all_pred_error <- tibble()
 
-# Save error per condition of predictions
-all_pred_errors <- tibble()
+# All predictions
+all_pred <- tibble()
 for (i in 1:length(cell_lines)) {
   
   print(paste("Iteration ", i, " out of ", length(cell_lines), ".", sep = ""))
@@ -122,12 +122,12 @@ for (i in 1:length(cell_lines)) {
   MDT_pred <-  val_data_err %>% 
     add_column(pred = as.character(predict(MDT, val_data_err)$predictions)) %>%
     select(-c(np_markers, best_sub)) %>%
-    gather(team, MDT_error, submissions) %>%
+    gather(team, ttm_MDT_error, submissions) %>%
     filter(pred==team) %>%
-    select(cell_line, treatment, time, marker, MDT_error)
+    select(cell_line, treatment, time, marker, ttm_MDT_error)
   
   MDT_val_score <- MDT_pred %>%
-    pull(MDT_error) %>%
+    pull(ttm_MDT_error) %>%
     mean()
   
   ## ------------------ Assess models on single cell level ---------------------------------
@@ -135,9 +135,8 @@ for (i in 1:length(cell_lines)) {
   #Predicted values by linear model
   lm_pred <- val_data_nest %>%
     left_join(select(linModel, -data)) %>%
-    filter(treatment == "EGF", time==23) %>%
     mutate(prediction = map2(lm, data, predict)) %>%
-    mutate(lm_pred =  map2(data, prediction, function(x, y) {add_column(x, "lm_pred" = y)})) %>%
+    mutate(lm_pred =  map2(data, prediction, function(x, y) {add_column(x, "cond_lm_pred" = y)})) %>%
     select(treatment, time, marker, lm_pred) %>%
     unnest(cols=c(lm_pred)) %>%
     ungroup() %>%
@@ -146,12 +145,12 @@ for (i in 1:length(cell_lines)) {
   # Error of predicted values by lm  
   lm_pred_error <- lm_pred %>%
     group_by(cell_line, treatment, time, marker) %>%
-    summarise(lm_error = sqrt(sum((standard - lm_pred)^2) / n())) %>%
-    select(cell_line, treatment, time, marker, lm_error) %>%
+    summarise(cond_lm_error = sqrt(sum((standard - cond_lm_pred)^2) / n())) %>%
+    select(cell_line, treatment, time, marker, cond_lm_error) %>%
     ungroup()
   
   lm_val_score <- lm_pred_error %>%
-    pull(lm_error) %>%
+    pull(cond_lm_error) %>%
     mean()
   
   # RF trained by condition
@@ -163,11 +162,13 @@ for (i in 1:length(cell_lines)) {
     unnest(cols = c(cond_RF_pred)) %>%
     ungroup() %>%
     select(-c(submissions, np_markers, n))
+  
   cond_RF_error <- cond_RF_pred %>%
     group_by(cell_line, treatment, time, marker) %>%
     summarise(cond_RF_error = sqrt(sum((standard - cond_RF_pred)^2) / n())) %>%
     select(cell_line, treatment, time, marker, cond_RF_error) %>%
     ungroup()
+  
   cond_RF_val_score <- cond_RF_error %>%
     pull(cond_RF_error) %>%
     mean()
@@ -194,12 +195,12 @@ for (i in 1:length(cell_lines)) {
   # Save all predictions
   predictions <- plyr::join_all(list(lm_pred, cond_RF_pred, RF_pred)) %>%
     as_tibble()
-  all_predictions <- bind_rows(all_predictions, predictions)
+  all_pred <- bind_rows(all_pred, predictions)
   
   # save all predictions errors
   errors <- plyr::join_all(list(MDT_pred, lm_pred_error, cond_RF_error, RF_error)) %>%
     as_tibble()
-  all_pred_errors <- bind_rows(all_pred_errors, errors)
+  all_pred_error <- bind_rows(all_pred_error, errors)
   
   ## Update feature importance of only treatment, timepoint and marker
   MDT_importance <- importance(MDT) %>% 
@@ -222,6 +223,8 @@ scores <- filter(scores, !is.na(CV_loop))
 if (TRUE) {
   saveRDS(scores, "./prediction_combinations/SC1/LOO_CV_DREAM_scores.rds")
   saveRDS(feature_importance, "./prediction_combinations/SC1/LOO_CV_DREAM_feature_importance.rds")
-  saveRDS(all_predictions, "./prediction_combinations/SC1/LOO_CV_DREAM_all_predictions.rds")
-  
+  saveRDS(all_pred, "./prediction_combinations/SC1/LOO_CV_DREAM_all_predictions.rds")
+  saveRDS(all_pred_error, "./prediction_combinations/SC1/LOO_CV_DREAM_pred_errors.rds")
 }
+
+pred <- readRDS("./prediction_combinations/SC1/LOO_CV_DREAM_all_predictions.rds")
