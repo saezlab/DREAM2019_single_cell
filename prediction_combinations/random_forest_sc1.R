@@ -5,7 +5,10 @@
 # error predicted by the arbiter, linear combination of all submission basedon error predicted by arbiter and a l
 # linear combination of of all submission by linear model that was trained on predicted and true values. 
 
-library(tidyverse)
+library(tidyr)
+library(purrr)
+library(tibble)
+library(dplyr)
 library(randomForest)
 
 setwd("~/Desktop/BQ internship/DREAM2019_single_cell")
@@ -18,6 +21,9 @@ sub_data_median <- readRDS("./submission_data/intermediate_data/sc1_median_condi
 sub_data_err <- readRDS( "./submission_data/intermediate_data/sc1_condErr_medianVals.rds") 
 # All single cell predictions of all teams and true values (standard) as well as 32 marker values of non predicted markers
 sub_data_all <- readRDS("./submission_data/intermediate_data/sc1_all_NP_predictions.rds")
+# Format all predictions of teams as CL, Tr, Ti, Ma, Nested predictions of cells
+sub_data_nested <- readRDS("./submission_data/intermediate_data/sc1_all_predictions_nested.rds")
+  
 
 np_markers <- c("b.CATENIN", "cleavedCas", "CyclinB", "GAPDH", "IdU", "Ki.67", "p.4EBP1", 
                 "p.AKT.Thr308.", "p.AMPK", "p.BTK", "p.CREB", "p.FAK", "p.GSK3b", "p.H3", "p.JNK",
@@ -50,8 +56,12 @@ scores <- tibble("CV_loop" = NA,
                  "lm" = NA,
                  "single" = NA,
                  "SC_MDT" = NA)
-# Save predictions made by each model
-all_predictions <- tibble()
+# Save errors of all predictions made by each model
+all_pred_error <- tibble()
+
+# All predictions
+all_pred <- tibble()
+
 for (i in 1:length(cell_lines)) {
   
   print(paste("Iteration ", i, " out of ", length(cell_lines), ".", sep = ""))
@@ -119,14 +129,22 @@ for (i in 1:length(cell_lines)) {
   ## ------------- Assess model performanceson condition level -------------------------------
   # Select for each condition the MDT estimated best predictor
   # Use error of the best predictors over the entire condition to score
-  MDT_pred <-  val_data_err %>% 
+  MDT_pred_best_team <-  val_data_err %>% 
     add_column(pred = as.character(predict(MDT, val_data_err, type = "class"))) %>%
     select(-c(np_markers, best_sub)) %>%
     gather(team, MDT_error, submissions) %>%
-    filter(pred==team) %>%
+    filter(pred==team) 
+  
+  MDT_pred_values <- MDT_pred_best_team %>%
+    left_join(sub_data_nested) %>%
+    select(cell_line, treatment, time, marker, data) %>%
+    unnest(data) %>%
+    arrange(glob_cellID, treatment, time, cellID, fileID, marker) 
+  
+  MDT_pred_error <- MDT_pred_best_team %>%
     select(cell_line, treatment, time, marker, MDT_error)
   
-  MDT_val_score <- MDT_pred %>%
+  MDT_val_score <- MDT_pred_error %>%
     pull(MDT_error) %>%
     mean()
   
@@ -135,14 +153,22 @@ for (i in 1:length(cell_lines)) {
   arbiter_pred <- lapply(arbiter, FUN = function(a) {predict(a, val_data_err)}) %>% as_tibble()
   
   # Select submission with lowest predicted error and score the combination
-  arbiter_pred_value <- val_data_err %>%
+  arbiter_pred_best_team <- val_data_err %>%
     add_column(pred = names(arbiter_pred)[max.col(-arbiter_pred)]) %>%
     select(-c(np_markers, best_sub)) %>%
     gather(team, arbiter_error, submissions) %>%
-    filter(pred==team)  %>%
+    filter(pred==team)
+  
+  arbiter_pred_values <- arbiter_pred_best_team  %>%
+    left_join(sub_data_nested) %>%
+    select(cell_line, treatment, time, marker, data) %>%
+    unnest(data) %>%
+    arrange(glob_cellID, treatment, time, cellID, fileID, marker) 
+  
+  arbiter_pred_error <- arbiter_pred_best_team %>%
     select(cell_line, treatment, time, marker, arbiter_error)
   
-  arbiter_val_score <- arbiter_pred_value  %>%
+  arbiter_val_score <- arbiter_pred_error  %>%
     pull(arbiter_error) %>%
     mean()
   
@@ -151,34 +177,50 @@ for (i in 1:length(cell_lines)) {
   SC_arbiter_pred <- lapply(arbiter, FUN = function(a) {predict(a, val_data_all)}) %>% as_tibble()
   W <- lapply(SC_arbiter_pred, function(v) {(1/rowSums(SC_arbiter_pred)/v)}) %>% as_tibble()
   W <- lapply(W, function(x){x/rowSums(W)}) %>% as_tibble()
+  
   lc_arbiter_pred <- val_data_all %>% 
     add_column(prediction = rowSums(select(val_data_all, submissions) * W)) %>%
+    arrange(glob_cellID, treatment, time, cellID, fileID, marker) 
+    
+  lc_arbiter_error <- lc_arbiter_pred %>%
     group_by(cell_line, treatment, time, marker) %>%
     summarise(lc_arbiter_error = sqrt(sum((standard - prediction)^2) / n())) %>%
     ungroup() %>%
     select(cell_line, treatment, time, marker, lc_arbiter_error)
   
-  lc_arbiter_val_score <- lc_arbiter_pred %>%
+  lc_arbiter_val_score <- lc_arbiter_error %>%
     pull(lc_arbiter_error) %>%
     mean()
   
   # Linear model
   lm_pred <- val_data_all %>% 
     add_column(prediction = predict(linModel, val_data_all)) %>%
+    arrange(glob_cellID, treatment, time, cellID, fileID, marker) 
+  
+  lm_error <- lm_pred %>%
     group_by(cell_line, treatment, time, marker) %>%
     summarise(lm_error = sqrt(sum((standard - prediction)^2) / n())) %>%
     select(cell_line, treatment, time, marker, lm_error)
   
-  lm_val_score <- lm_pred %>%
+  lm_val_score <- lm_error %>%
     pull(lm_error) %>%
     mean()
   
   # Score predictions of single best model
-  SB_pred <- val_data_err %>% 
+  SB_pred <- sub_data_nested %>%
+    ungroup() %>%
+    filter(team == single_best) %>%
+    right_join(val_data_err) %>%
+    select(cell_line, treatment, time, marker, data) %>%
+    add_column(model = "single best") %>%
+    unnest(data) %>%
+    arrange(model, glob_cellID, treatment, time, cellID, fileID, marker) 
+  
+  SB_error <- val_data_err %>% 
     select(cell_line, treatment, time, marker, single_best) %>%
     rename(SB_error = single_best)
   
-  SB_val_score <- SB_pred %>%
+  SB_val_score <- SB_error %>%
     pull(SB_error) %>%
     mean()
   
@@ -187,12 +229,15 @@ for (i in 1:length(cell_lines)) {
     add_column(pred = predict(MDT, val_data_all, type = "class")) %>%
     select(-np_markers) %>%
     gather(team, prediction, submissions) %>%
-    filter(pred==team)  %>%
+    filter(pred==team) %>%
+    arrange(glob_cellID, treatment, time, cellID, fileID, marker) 
+  
+  SC_MDT_error <-SC_MDT_pred %>%
     group_by(cell_line, treatment, time, marker) %>%
     summarise(SC_MDT_error = sqrt(sum((standard - prediction)^2) / n())) %>%
     select(cell_line, treatment, time, marker, SC_MDT_error)
   
-  SC_MDT_val_score <- SC_MDT_pred %>%
+  SC_MDT_val_score <- SC_MDT_error %>%
     pull(SC_MDT_error) %>%
     mean()
   
@@ -222,17 +267,30 @@ for (i in 1:length(cell_lines)) {
     mutate(importance = importance + MDT_imp + arbiter_imp) %>%
     select(feature, importance) 
   
-  # Save all predictions
-  predictions <- plyr::join_all(list(MDT_pred, arbiter_pred_value, lc_arbiter_pred, lm_pred, SB_pred, SC_MDT_pred)) %>%
+  # Save all predictions and all errors of predictions
+  predictions <- val_data_all %>%
+    select(glob_cellID, treatment, time, cellID, fileID, marker) %>%
+    arrange(glob_cellID, treatment, time, cellID, fileID, marker) %>%
+    add_column("MDT" = MDT_pred_values$prediction,
+               "arbiter" = arbiter_pred_values$prediction,
+               "lc_arbiter" = lc_arbiter_pred$prediction,
+               "lm" = lm_pred$prediction,
+               "SB" = SB_pred$prediction,
+               "SC_MDT" = SC_MDT_pred$prediction)
+  all_pred <- bind_rows(all_pred, predictions)
+  
+  errors <- plyr::join_all(list(MDT_pred_error, arbiter_pred_error, lc_arbiter_error, lm_error, 
+                                SB_error, SC_MDT_error)) %>%
     as_tibble()
   
-  all_predictions <- bind_rows(all_predictions, predictions)
+  all_pred_error <- bind_rows(all_pred_error, errors)
 }
 scores <- filter(scores, !is.na(CV_loop))  
 if (TRUE) {
   saveRDS(scores, "./prediction_combinations/SC1/LOO_CV_RF_scores.rds")
   saveRDS(feature_importance, "./prediction_combinations/SC1/LOO_CV_RF_feature_importance.rds")
-  saveRDS(all_predictions, "./prediction_combinations/SC1/LOO_CV_RF_all_predictions.rds")
+  saveRDS(all_pred_error, "./prediction_combinations/SC1/LOO_CV_RF_pred_error.rds")
+  saveRDS(all_pred, "./prediction_combinations/SC1/LOO_CV_RF_all_predictions.rds")
   
 }
 
