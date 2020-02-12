@@ -34,11 +34,15 @@ cell_lines <-  dbListTables(con)
 
 cell_lines  <- cell_lines[cell_lines != "HCC70_2"]  # remove the duplicated
 
-cell_line_sheet <- readxl::read_excel("./data/cell_line_distribution.xlsx",sheet = 1,range = "A1:J69")
+cell_line_sheet <- readxl::read_excel("./data/cell_line_distribution.xlsx",sheet = 1,range = "A1:J68")
 
-## Just for rerunning for aim 1.2.2 -- dont use
-# cell_lines  = cell_line_sheet %>% filter(AIM_1_2_2 == "test") %>% pull(cell_line)
+## temp: Just for generating some complete cases -- dont use
+#complete_1  = list.files("./challenge_data/single_cell_phospho/complete_cell_lines/") %>% gsub(".csv","",.)
+#cell_lines  = cell_line_sheet %>% filter(free == 1) %>% pull(cell_line)
+#cell_lines = setdiff(cell_lines, complete_1)
 ### end temp
+
+
 
 
 bar = progress::progress_bar$new(format = "  Processing [:bar] :percent eta: :eta",
@@ -73,30 +77,30 @@ for(current_cell_line in cell_lines){
 	cat("imTOR condition removed from public data \n",file = log_file)
 	
 	if(purpose$AIM_1_1 =="test"){
-		
+
 		cat("AIM 1.1 test cell line \n",file = log_file)
 		cat("removing targeted p-sites from public data \n",file = log_file)
-		
+
 		public_data[,c("p.ERK", "p.Akt.Ser473.","p.S6","p.HER2", "p.PLCg2")] = NA_real_
-		
+
 		cat("imTOR condition removed from validation data \n",file = log_file)
 		validation_data = validation_data %>% filter(treatment!="imTOR") %>%
 			select(cell_line, treatment,time,cellID,fileID,c("p.ERK", "p.Akt.Ser473.","p.S6","p.HER2", "p.PLCg2"))
-		
+
 		cat("writing public and validation datasets \n",file = log_file)
-		
+
 		# write out with 6 digit precision
-		write_csv(public_data %>% mutate_if(is.double,format,digits=6), 
+		write_csv(public_data %>% mutate_if(is.double,format,digits=6),
 				  path = file.path(target_folder,'single_cell_phospho',"aim_1_1",paste0(current_cell_line,".csv")))
-		
+
 		# write out with 6 digit precision
-		write_csv(validation_data %>% mutate_if(is.double,format,digits=6), 
+		write_csv(validation_data %>% mutate_if(is.double,format,digits=6),
 				  path = file.path(target_folder,'validation_data',paste0("AIM_11_",current_cell_line,".csv")))
-		
+
 	}else if(purpose$AIM_1_2_1 == "test"){
 		cat("AIM 1.2.1 test cell line \n",file = log_file)
 		cat("removing iPKC condition from public data \n",file = log_file)
-		
+
 		# remove HER2 and PLCg2 from validation, because in some cell-lines they are misssing anyways
 		required_columns <- c('cell_line','treatment', 'time', "cellID","fileID",
 							  'b.CATENIN', 'cleavedCas', 'CyclinB', 'GAPDH', 'IdU',
@@ -104,72 +108,74 @@ for(current_cell_line in cell_lines){
 							  'p.AMPK', 'p.BTK', 'p.CREB', 'p.ERK', 'p.FAK', 'p.GSK3b',
 							  'p.H3', 'p.JNK', 'p.MAP2K3', 'p.MAPKAPK2',
 							  'p.MEK', 'p.MKK3.MKK6', 'p.MKK4', 'p.NFkB', 'p.p38',
-							  'p.p53', 'p.p90RSK', 'p.PDPK1', 'p.RB', 
+							  'p.p53', 'p.p90RSK', 'p.PDPK1', 'p.RB',
 							  'p.S6', 'p.S6K', 'p.SMAD23', 'p.SRC', 'p.STAT1',
-							  'p.STAT3', 'p.STAT5') 
-		
+							  'p.STAT3', 'p.STAT5')
+
 		if(current_cell_line %in% c("MDAMB468","MCF12A","BT483")){
 			cat("iEGFR condition selected for validation data \n",file = log_file)
 			public_data = public_data %>% filter(treatment!="iEGFR")
 			validation_data = validation_data %>% filter(treatment=="iEGFR") %>% select(required_columns)
-			
+
 		}else if(current_cell_line %in% c("184B5","ZR751","HCC202")){
 			cat("iMEK condition selected for validation data \n",file = log_file)
 			public_data = public_data %>% filter(treatment!="iMEK")
 			validation_data = validation_data %>% filter(treatment=="iMEK") %>% select(required_columns)
-			
+
 		}else if(current_cell_line  %in% c("UACC3199","SKBR3","MDAMB231")){
 			cat("iPI3K condition selected for validation data \n",file = log_file)
 			public_data = public_data %>% filter(treatment!="iPI3K")
 			validation_data = validation_data %>% filter(treatment=="iPI3K") %>% select(required_columns)
-			
+
 		}else if(current_cell_line  %in% c("HCC1806","Hs578T","HCC1428")){
 			cat("iPKC condition selected for validation data \n",file = log_file)
 			public_data = public_data %>% filter(treatment!="iPKC")
 			validation_data = validation_data %>% filter(treatment=="iPKC") %>% select(required_columns)
-			
+
 		}else stop("AIM_1_2_1 cell-lines changed!!!")
-		
-		
+
+
 		cat("writing public and validation datasets \n",file = log_file)
-		
+
 		# write out with 6 digit precision
-		write_csv(public_data %>% mutate_if(is.double,format,digits=6), 
+		write_csv(public_data %>% mutate_if(is.double,format,digits=6),
 				  path = file.path(target_folder,'single_cell_phospho',"aim_1_2_1",paste0(current_cell_line,".csv")))
-		
+
 		# write out with 6 digit precision
-		write_csv(validation_data %>% mutate_if(is.double,format,digits=6), 
+		write_csv(validation_data %>% mutate_if(is.double,format,digits=6),
 				  path = file.path(target_folder,'validation_data',paste0("AIM_121_",current_cell_line,".csv")))
-		
+
 	}else if(purpose$AIM_1_2_2 == "test"){
 		cat("AIM 1.2.2 test cell line \n",file = log_file)
 		cat("no training condition ! \n",file = log_file)
-		
-		validation_data = validation_data %>% filter(treatment=="imTOR") 
-		
+
+		validation_data = validation_data %>% filter(treatment=="imTOR")
+
 		cat("writing validation datasets \n",file = log_file)
-		
+
 		# write out with 6 digit precision
-		write_csv(validation_data %>% mutate_if(is.double,format,digits=6), 
+		write_csv(validation_data %>% mutate_if(is.double,format,digits=6),
 				  path = file.path(target_folder,'validation_data',paste0("AIM_122_",current_cell_line,".csv")))
-		
+
+
 	}else if(purpose$AIM2 == "test"){
 		cat("AIM 2 test cell line \n",file = log_file)
-		
+
 		cat("keeping only Full condition from public data \n",file = log_file)
-		
+
 		public_data = public_data %>% filter(treatment=="full")
-		
+
 		cat("writing public datasets \n",file = log_file)
-		
+
 		# write out with 6 digit precision
-		write_csv(public_data %>% mutate_if(is.double,format,digits=6), 
+		write_csv(public_data %>% mutate_if(is.double,format,digits=6),
 				  path = file.path(target_folder,'single_cell_phospho',"aim_2",paste0(current_cell_line,".csv")))
-		
+
 		# nothing to do with validation data
 		# this challenge is handled in export_dream_median_phospho.R
-		
-	}else {
+	}
+
+	if (purpose$free ==1){
 		cat("complete training data \n",file = log_file)
 		
 		# write out with 6 digit precision
@@ -189,10 +195,12 @@ dbDisconnect(con)
 
 # AIM 1.1
 temp_files =  list.files(file.path(target_folder,"validation_data"),pattern = "AIM_11_",full.names = T)
-prediction_data = temp_files %>% 
+validation_data = temp_files %>% 
 	map(read_csv) %>% bind_rows()
 
-write_csv(prediction_data,"./challenge_data/validation_data/AIM_11_data.csv")
+validation_data$glob_cellID = 1:nrow(validation_data)
+validation_data = validation_data %>% ungroup() %>% mutate(glob_cellID = 1:n()) %>% select(glob_cellID,everything())
+write_csv(validation_data,"./challenge_data/validation_data/AIM_11_data.csv")
 
 
 # AIM 1.2.1

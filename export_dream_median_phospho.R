@@ -8,7 +8,7 @@
 # 3. export the validation data. 
 
 
-median_interpolated_data <- read_rds("./data/median_data/interpolated_median_all_reporters_mine.rds")
+median_interpolated_data <- read_rds("./data/median_data/interpolated_median_allsamples_correct_times.rds")
 median_data <- median_interpolated_data %>% spread(reporter,value)
 # cell-line in aims
 cell_line_sheet <- readxl::read_excel("./data/cell_line_distribution.xlsx",sheet = 1,range = "A1:I69")
@@ -37,8 +37,23 @@ public_data <- median_data %>% filter(treatment != "imTOR")  %>%# remove imTOR c
 			
 		}else if(purpose$AIM_1_2_1 == "test"){
 			# remove all data in condition to be predicted
-			
-			data = data %>% filter(treatment!="iPKC")
+			if(current_cell_line %in% c("MDAMB468","MCF12A","BT483")){
+				
+				data = data %>% filter(treatment!="iEGFR")
+				
+			}else if(current_cell_line %in% c("184B5","ZR751","HCC202")){
+				
+				data = data %>% filter(treatment!="iMEK")
+				
+			}else if(current_cell_line  %in% c("UACC3199","SKBR3","MDAMB231")){
+				
+				data = data %>% filter(treatment!="iPI3K")
+				
+			}else if(current_cell_line  %in% c("HCC1806","Hs578T","HCC1428")){
+				
+				data = data %>% filter(treatment!="iPKC")
+				
+			}
 			
 		}else if(purpose$AIM_1_2_2 == "test"){
 			
@@ -60,6 +75,7 @@ write_csv(public_data,path = "./challenge_data/median_phospho/median_phospho_dat
 # export the conditions and use NA fo the values that the participants ahve to predict
 
 prediction_data <- median_data %>% filter(treatment != "imTOR")  %>%# remove imTOR condition from all
+	select(-p.HER2,-p.PLCg2) %>% # no need to predict these
 	group_by(cell_line) %>% nest(.key = "data") %>% 
 	mutate(cleaned_data = map2(data,cell_line,function(data,cell_line){
 		
@@ -82,13 +98,14 @@ prediction_data <- median_data %>% filter(treatment != "imTOR")  %>%# remove imT
 	})) %>% unnest(cleaned_data)
 
 
-write_csv(prediction_data,path = "./challenge_data/predict_conditions/AIM_2_median_data.csv")	
+write_csv(prediction_data,path = "./challenge_data/predict_conditions/AIM_2_template_data.csv")	
 
 
 ### # 3. export the validation data.  --------------------------------------------
 # export the conditions for validaion
 
 validation_data <- median_data %>% filter(treatment != "imTOR")  %>%# remove imTOR condition from all
+	select(-p.HER2,-p.PLCg2) %>% # no need to predict these
 	group_by(cell_line) %>% nest(.key = "data") %>% 
 	mutate(cleaned_data = map2(data,cell_line,function(data,cell_line){
 		

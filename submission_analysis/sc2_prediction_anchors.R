@@ -1,6 +1,6 @@
 
 library(tidyverse)
-# SC1 
+# SC2
 
 
 # we compare the stats computed on timecourse A and time course B to the the participants statistics. 

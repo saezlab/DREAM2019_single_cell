@@ -115,6 +115,19 @@ bootstrap_RMSE <- tibble(BS_sample = seq(N_bootstrap)) %>%
 						 	summarise_at(as.character(ranked_teams),mean))) %>% unnest()
 
 
+
+# save intermediate summary results for postchallange analyis
+if(FALSE){
+	write_rds(RMSE_conditions,"./submission_analysis/intermediate_data/sc4_rmse_conditions.rds")
+	write_rds(combined_data,"./submission_analysis/intermediate_data/sc4_combined_data.rds")
+	write_rds(bootstrap_RMSE,"./submission_analysis/intermediate_data/sc4_bootstrap_rmse.rds")
+	write_rds(ranked_teams, "./submission_analysis/intermediate_data/sc4_ranked_teams.rds")
+}
+
+
+
+
+
 # plotting by boxplot
 bootstrap_RMSE %>% 
 	gather(teams,RMSE,-BS_sample) %>%
