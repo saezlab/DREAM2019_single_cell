@@ -1,4 +1,5 @@
-# naive and good models
+# 
+# we pick some metrics on the golden standard, to show how good are the models. 
 
 library(tidyverse)
 # SC1 
@@ -35,12 +36,11 @@ randomised_conditional_score <- function(i,gs){
 		mutate(random_prediction = sample(standard)) %>% 
 		summarise(RMSE_random = rmse(standard,random_prediction)) %>%
 		pull(RMSE_random) %>% mean()
-		
-	
 }
 
 random_pred_score <- tibble(samp = seq(1:5)) %>% rowwise() %>% 
-	mutate( random_score = map_dbl(samp,randomised_conditional_score,gs))
+	mutate( random_score = map_dbl(samp,randomised_conditional_score,gs)) %>%
+	ungroup()
 
 random_pred_score %>% summarise(mean = mean(random_score),
  								sd = sd(random_score))
@@ -60,12 +60,13 @@ randomised_score <- function(i,gs){
 	gs %>% mutate(random_prediction = sample(standard)) %>% 
 		summarise(RMSE_random = rmse(standard,random_prediction)) %>%
 		pull(RMSE_random) %>% mean()
-	
-	
+
 }
 
 random_pred_score <- tibble(samp = seq(1:5)) %>% rowwise() %>% 
-	mutate( random_score = map_dbl(samp,randomised_score,gs))
+	mutate( random_score = map_dbl(samp,randomised_score,gs)) %>%
+	ungroup()
+
 
 random_pred_score %>% ungroup() %>%
 	summarise(mean = mean(random_score),
@@ -76,23 +77,47 @@ random_pred_score %>% ungroup() %>%
 # 	1  2.21 0.000370
 
 
-### 3: neirest neighbours ------------------------------------------------------
-sc1_data = map(list.files("./challenge_data/single_cell_phospho/subchallenge_1/", full.names = T),read_csv) %>%
-	bind_rows()
-gs_orig <- read_csv("./challenge_data/validation_data/sc1gold.csv")	
-	
-sc1_total <- sc1_data %>% select(-reporters) %>% arrange(cell_line, treatment, time, cellID, fileID) %>%
-	bind_cols(gs_orig %>% arrange(cell_line, treatment, time, cellID, fileID) %>% select(reporters))
+### 3: predict in-cell-line ----------------------------------------------------
+# the idea here is the following: 
+# we measure the variance 
 
-temp_data = sc1_total %>% filter(cell_line=="AU565",treatment=="EGF",time==0)
+ch_data <- list.files("./challenge_data/single_cell_phospho/subchallenge_1/", full.names = T) %>%
+	map_dfr(read_csv)
+
+gs_wide <- gs %>% spread(marker,standard)
 
 
+gs_all <- full_join(ch_data %>% select(-reporters),
+					gs_wide, by = c("treatment", "cell_line", "time", "cellID", "fileID"))
 library(caret)
-knn_model <- FNN::knn.reg(train = temp_data %>% select(all_reporters,-p.ERK),
-						  y =  temp_data %>% pull(p.ERK),
-						  test = NULL,
-						  k = 5)
 
-tibble(pred = knn_model$pred, data= temp_data$p.ERK) %>% ggplot() + geom_point(aes(pred,data))
+compute_RMSE <- function(scdata){
+	RMSE <- c()
+	for(i in 1:length(reporters)){
+		model_data <- scdata %>% select( reporters[[i]],setdiff(all_reporters,reporters))
+		
+		train_control<- trainControl(method="cv", number=10, savePredictions = TRUE)
+		model<- train(reformulate(termlabels =setdiff(all_reporters,reporters),
+								  response = reporters[[i]]), data=model_data, trControl=train_control, method="lm")
+		RMSE[[i]] <- model$results$RMSE
+		
+	}
+	names(RMSE) <- reporters
+	return(enframe(RMSE,name = "marker"))
+}
 
-# this would take for long
+
+estim_RMSE_cl_tr_tm <- gs_all %>%
+	group_by(cell_line, treatment, time) %>%
+	nest() %>% 
+	mutate(RMSE = map(data,compute_RMSE)) %>% select(-data) %>% unnest(RMSE) 
+estim_RMSE_cl_tr_tm %>% pull(value) %>% mean()
+
+estim_RMSE_global <- gs_all %>%
+	nest() %>% 
+	mutate(RMSE = map(data,compute_RMSE)) %>% select(-data) %>% unnest(RMSE) 
+
+estim_RMSE_tr_tm <- gs_all %>%
+	group_by(treatment, time) %>%
+	nest() %>% 
+	mutate(RMSE = map(data,compute_RMSE)) %>% select(-data) %>% unnest(RMSE) 

@@ -132,6 +132,14 @@ bootstrap_stats <- tibble(BS_sample = seq(N_bootstrap)) %>%
 	) %>% unnest()
 
 
+# save intermediate summary results for postchallange analyis
+if(FALSE){
+	write_rds(condition_stats_SumSquared,"./submission_analysis/intermediate_data/sc2_stats_sumSquared_conditions.rds")
+	write_rds(combined_statistics,"./submission_analysis/intermediate_data/sc2_stats_conditions.rds")
+	write_rds(bootstrap_stats,"./submission_analysis/intermediate_data/sc2_bootstrap_stats.rds")
+	write_rds(ranked_teams, "./submission_analysis/intermediate_data/sc2_ranked_teams.rds")
+}
+
 
 # Plot the performance of the team on the bootstrap samples
 bootstrap_stats %>% 

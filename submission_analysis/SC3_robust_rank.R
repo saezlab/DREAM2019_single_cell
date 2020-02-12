@@ -137,6 +137,16 @@ bootstrap_stats <- tibble(BS_sample = seq(N_bootstrap)) %>%
 
 
 
+# save intermediate summary results for postchallange analyis
+if(FALSE){
+	write_rds(condition_stats_SumSquared,"./submission_analysis/intermediate_data/sc3_stats_sumSquared_conditions.rds")
+	write_rds(combined_statistics,"./submission_analysis/intermediate_data/sc3_stats_conditions.rds")
+	write_rds(bootstrap_stats,"./submission_analysis/intermediate_data/sc3_bootstrap_stats.rds")
+	write_rds(ranked_teams, "./submission_analysis/intermediate_data/sc3_ranked_teams.rds")
+}
+
+
+
 # plotting by boxplot
 bootstrap_stats %>% 
 	gather(teams,score,-BS_sample) %>%

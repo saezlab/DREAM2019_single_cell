@@ -15,7 +15,7 @@ median_data <- read_csv("./challenge_data/median_phospho/median_phospho_data.csv
 
 cell_lines <-  dbListTables(con)
 
-
+cell_lines = setdiff(cell_lines,"HCC70_2")
 
 
 cell_line_sheet <- readxl::read_excel("./data/cell_line_distribution.xlsx",sheet = 1,range = "A1:I69")
@@ -24,6 +24,10 @@ bar = progress::progress_bar$new(format = "  Processing [:bar] :percent eta: :et
 								 total = length(cell_lines))
 
 current_cell_line = cell_lines[[1]]
+current_cell_line = cell_lines[[3]]
+current_cell_line = cell_lines[[2]]
+current_cell_line = cell_lines[[4]]
+current_cell_line = cell_lines[[8]]
 
 for(current_cell_line in cell_lines){	
 	bar$tick()
@@ -50,12 +54,12 @@ for(current_cell_line in cell_lines){
 		# 1. remove imTOR condition in the public_data from all cell-lines. 
 		public_data <- public_data %>% filter(treatment!="imTOR")
 		
-		predict_conditions = public_data %>% select(cell_line,treatment,time,cellID,fileID,c("p.ERK", "p.Akt.Ser473.","p.S6","p.HER2", "p.PLCg2")) %>%
+		prediction_templates = public_data %>% select(cell_line,treatment,time,cellID,fileID,c("p.ERK", "p.Akt.Ser473.","p.S6","p.HER2", "p.PLCg2")) %>%
 			mutate_at(c("p.ERK", "p.Akt.Ser473.","p.S6","p.HER2", "p.PLCg2"),~NA_real_)
 		
 		# write out with 6 digit precision
-		write_csv(predict_conditions, 
-				  path = file.path(target_folder,'predict_conditions',paste0("AIM_1_1_",current_cell_line,".csv")))
+		write_csv(prediction_templates, 
+				  path = file.path(target_folder,'prediction_templates',paste0("AIM_11_",current_cell_line,".csv")))
 		
 		
 	}else if(purpose$AIM_1_2_1 == "test"){
@@ -64,38 +68,57 @@ for(current_cell_line in cell_lines){
 		# 1. remove imTOR condition in the public_data from all cell-lines. 
 		public_data <- public_data %>% filter(treatment!="imTOR")
 		
-		reporters = colnames(public_data)[-1:-5]
+		reporters = setdiff(colnames(public_data),c("treatment","cell_line","time","cellID","fileID","p.HER2","p.PLCg2"))
 		
 		# we find first the unique conditions
 		# then we expand each conditions with cellID: 1-10k
-		predict_conditions = public_data %>% filter(treatment=="iPKC") %>% 
-			select(-cellID,-fileID) %>%
+		
+		if(current_cell_line %in% c("MDAMB468","MCF12A","BT483")){
+			public_data = public_data %>% filter(treatment=="iEGFR") 
+	
+		}else if(current_cell_line %in% c("184B5","ZR751","HCC202")){
+			
+			public_data = public_data %>% filter(treatment=="iMEK")
+			
+		}else if(current_cell_line  %in% c("UACC3199","SKBR3","MDAMB231")){
+			
+			public_data = public_data %>% filter(treatment=="iPI3K")
+			
+		}else if(current_cell_line  %in% c("HCC1806","Hs578T","HCC1428")){
+			
+			public_data = public_data %>% filter(treatment=="iPKC")
+			
+		}
+		
+		
+		prediction_templates = public_data %>% 
+			select(cell_line, treatment,time, -cellID,-fileID,reporters) %>%
 			group_by(cell_line,treatment,time) %>% mutate_at(reporters,~NA_real_) %>%unique() %>%
 			nest() %>% mutate(extended_data = map(data,function(data){
 				data.frame(cellID = 1:10000,data)	
 			})) %>% unnest(extended_data)
 			
 		# write out with 6 digit precision
-		write_csv(predict_conditions, 
-				  path = file.path(target_folder,'predict_conditions',paste0("AIM_1_2_1_", current_cell_line,".csv")))
+		write_csv(prediction_templates, 
+				  path = file.path(target_folder,'prediction_templates',paste0("AIM_121_", current_cell_line,".csv")))
 		
 	
 	}else if(purpose$AIM_1_2_2 == "test"){
 		
-		reporters = colnames(public_data)[-1:-5]
+		reporters = setdiff(colnames(public_data),c("treatment","cell_line","time","cellID","fileID","p.HER2","p.PLCg2"))
 		
 		# we find first the unique conditions
 		# then we expand each conditions with cellID: 1-10k
-		predict_conditions = public_data %>% filter(treatment=="imTOR") %>% 
-			select(-cellID,-fileID) %>%
+		prediction_templates = public_data %>% filter(treatment=="imTOR") %>% 
+			select(cell_line, treatment,time, -cellID,-fileID,reporters) %>%
 			group_by(cell_line,treatment,time) %>% mutate_at(reporters,~NA_real_) %>%unique() %>%
 			nest() %>% mutate(extended_data = map(data,function(data){
 				data.frame(cellID = 1:10000,data)	
 			})) %>% unnest(extended_data)
 		
 		# write out with 6 digit precision
-		write_csv(predict_conditions, 
-				  path = file.path(target_folder,'predict_conditions',paste0("AIM_1_2_2_", current_cell_line,".csv")))
+		write_csv(prediction_templates, 
+				  path = file.path(target_folder,'prediction_templates',paste0("AIM_122_", current_cell_line,".csv")))
 		
 	}else if(purpose$AIM2 == "test"){
 		# nothing to do.
@@ -104,3 +127,36 @@ for(current_cell_line in cell_lines){
 }
 
 dbDisconnect(con)
+
+
+
+##### Aggregate files ----------------------------------------------------------
+# previously we exported the validation per cell-line, now we import them and aggregate.
+
+# AIM 1.1
+temp_files =  list.files(file.path(target_folder,"prediction_templates"),pattern = "AIM_11_",full.names = T)
+template_data = temp_files %>% 
+	map(read_csv) %>% bind_rows()
+# here we added the glob_cellID
+write_csv(template_data,"./challenge_data/prediction_templates/AIM_11_template_data.csv")
+file.remove(temp_files )
+
+# AIM 1.2.1
+temp_files =   list.files(file.path(target_folder,"prediction_templates"),pattern = "AIM_121_",full.names = T)
+template_data = temp_files  %>% 
+	map(read_csv) %>% bind_rows()
+
+write_csv(template_data,"./challenge_data/prediction_templates/AIM_121_template_data.csv")
+file.remove(temp_files )
+
+# AIM 1.2.2
+temp_files =  list.files(file.path(target_folder,"prediction_templates"),pattern = "AIM_122_",full.names = T)
+template_data = temp_files %>% 
+	map(read_csv) %>% bind_rows()
+
+write_csv(template_data,"./challenge_data/prediction_templates/AIM_122_template_data.csv")
+
+file.remove(temp_files )
+
+
+

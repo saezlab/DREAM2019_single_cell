@@ -2,7 +2,7 @@
 #
 # author: Attila Gabor
 # 
-# Short summary:
+# Short summary: Bootstrap ranking
 # In the subchallenge the score is based on averaging the modelling 
 # errors across all conditions.
 # To assess if the small differences between the top performing teams are 
@@ -98,6 +98,10 @@ RMSE_conditions <- combined_data %>%
 	summarise_at(as.character(ranked_teams),~ sqrt(sum((standard - .)^2) / n())) %>%
 	ungroup()
 
+median_conditions <- combined_data %>% 
+	group_by(cell_line, treatment, time, marker) %>%
+	summarise_at(c("standard",as.character(ranked_teams)),~ median(.)) %>%
+	ungroup()
 
 ## Bootstrapping: 
 # we repeat N=1000 times the boostrapping from the conditions and compare the 
@@ -110,6 +114,17 @@ bootstrap_RMSE <- tibble(BS_sample = seq(N_bootstrap)) %>%
 	mutate( map(BS_sample, .f = ~ RMSE_conditions %>% 
 						 	sample_frac(size = 1, replace = TRUE) %>%
 						 	summarise_at(as.character(ranked_teams),mean))) %>% unnest()
+
+
+
+# save intermediate summary results for postchallange analyis
+if(FALSE){
+	write_rds(RMSE_conditions,"./submission_analysis/intermediate_data/sc1_rmse_conditions.rds")
+	write_rds(median_conditions,"./submission_analysis/intermediate_data/sc1_median_conditions.rds")
+	write_rds(bootstrap_RMSE,"./submission_analysis/intermediate_data/sc1_bootstrap_rmse.rds")
+	write_rds(ranked_teams, "./submission_analysis/intermediate_data/sc1_ranked_teams.rds")
+}
+
 
 
 # Plot the performance of the team on the bootstrap samples

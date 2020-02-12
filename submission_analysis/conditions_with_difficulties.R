@@ -29,6 +29,32 @@ rmse_data %>% select(-X.Huiyuan,-SCG) %>%
 					   cluster_rows = FALSE)
 
 
+
+#### Who wins in which condition
+rmse_data %>% gather(team, rmse,-1:-4) %>% group_by(cell_line, treatment, time, marker) %>%
+	top_n(-1,wt = rmse) %>%
+	ungroup() %>%
+	mutate(time = ifelse(time==18,17,time)) %>%
+	mutate(time = ifelse(time==14,13,time)) %>%
+	unite(cond1, cell_line,marker) %>% 
+	unite(cond2,treatment,time) %>%
+	ggplot(aes(cond1,cond2)) +
+	geom_tile(aes(fill=as.factor(team))) +
+	theme(axis.text.x = element_text(hjust=1,angle = 45))
+	
+	#select(-rmse) %>% 
+rmse_data %>% gather(team, rmse,-1:-4) %>% group_by(cell_line, treatment, time, marker) %>%
+	top_n(-1,wt = rmse) %>%
+	ungroup() %>% pull(team) %>% table() %>% sort() %>% sum()
+	
+	# spread(cond2,team) %>% 
+	# column_to_rownames("cond1") %>%
+	# pheatmap::pheatmap(cluster_rows = F,cluster_cols = F)
+
+
+
+
+
 #################
 # what is the most difficult part to predict? 
 # plot the RMSE from  different views
