@@ -1,9 +1,10 @@
 ## SC1; ranfom forest
-# Do crossvalidation to find how to combine the predictions, leaving two cell lines out as validation set
+# Do crossvalidation to find how to combine the predictions, leaving one cell line out as validation set
 # A meta decision tree, arbiter and linear model are built
-# Predictions made by selecting value of best submission as predicted by MDT, value taken from submission with lowest
-# error predicted by the arbiter, linear combination of all submission basedon error predicted by arbiter and a l
-# linear combination of of all submission by linear model that was trained on predicted and true values. 
+# Predictions made by selecting values of best submission as predicted by MDT per condition, 
+# values taken from submission with lowest error predicted by the arbiter per condition
+# linear combination of all submission based on error predicted by arbiter for single cells 
+# and a linear combination of all predicted single cells by linear model that was trained on predicted and true values. 
 
 library(tidyr)
 library(purrr)
@@ -15,8 +16,6 @@ setwd("~/Desktop/BQ internship/DREAM2019_single_cell")
 
 # Participating team names
 submissions <-  readRDS("./submission_data/intermediate_data/sc1_ranked_teams.rds") %>% as.character()
-# Median prediction per team per condition (cell line, treatment, time, marker) and the median values of 32 non predicted markers\)
-sub_data_median <- readRDS("./submission_data/intermediate_data/sc1_median_conditions_np.rds")
 # Error per team per condition (cell line, treatment, time, marker) and the median values of 32 non predicted markers
 sub_data_err <- readRDS( "./submission_data/intermediate_data/sc1_condErr_medianVals.rds") 
 # All single cell predictions of all teams and true values (standard) as well as 32 marker values of non predicted markers
@@ -30,17 +29,6 @@ np_markers <- c("b.CATENIN", "cleavedCas", "CyclinB", "GAPDH", "IdU", "Ki.67", "
                 "p.MAP2K3", "p.MAPKAPK2", "p.MEK", "p.MKK3.MKK6", "p.MKK4", "p.NFkB", "p.p38", "p.p53",
                 "p.p90RSK", "p.PDPK1", "p.RB", "p.S6K", "p.SMAD23", "p.SRC", "p.STAT1", "p.STAT3", 
                 "p.STAT5")
-if (FALSE) {
-  # Each row represents a unique combination of two cell lines
-  # Each row will be used as validation cell lines once
-  CL_combi <- expand.grid(cell_lines, cell_lines) %>% 
-    as_tibble() %>%
-    mutate(Var1 = as.character(Var1), Var2 = as.character(Var2)) %>%
-    filter(! Var1 == Var2) %>%
-    group_by(grp = paste(pmax(Var1, Var2), pmin(Var1, Var2), sep = "_")) %>%
-    slice(1) %>%
-    ungroup() %>%
-    select(-grp)}
 
 cell_lines <- unique(sub_data_err$cell_line)
 
@@ -71,9 +59,6 @@ for (i in 1:length(cell_lines)) {
     filter(!cell_line %in% cell_lines[i]) %>%
     arrange(cell_line, treatment, time, marker) %>%
     mutate_if(is.character, as.factor)
-  train_data_median <- sub_data_median %>% # Used for lm
-    filter(!cell_line %in% cell_lines[i]) %>%
-    arrange(cell_line, treatment, time, marker)  
   train_data_all <- sub_data_all %>% # Used for lm
     filter(!cell_line %in% cell_lines[i]) %>%
     arrange(cell_line, treatment, time, marker)
@@ -82,9 +67,6 @@ for (i in 1:length(cell_lines)) {
     filter(cell_line %in% cell_lines[i]) %>%
     arrange(cell_line, treatment, time, marker) %>%
     mutate_if(is.character, as.factor)
-  val_data_median <- sub_data_median %>%
-    filter(cell_line %in% cell_lines[i]) %>%
-    arrange(cell_line, treatment, time, marker)
   val_data_all <- sub_data_all %>%
     filter(cell_line %in% cell_lines[i]) %>%
     arrange(cell_line, treatment, time, marker) %>%
@@ -286,7 +268,7 @@ for (i in 1:length(cell_lines)) {
   all_pred_error <- bind_rows(all_pred_error, errors)
 }
 scores <- filter(scores, !is.na(CV_loop))  
-if (TRUE) {
+if (FALSE) {
   saveRDS(scores, "./prediction_combinations/SC1/LOO_CV_RF_scores.rds")
   saveRDS(feature_importance, "./prediction_combinations/SC1/LOO_CV_RF_feature_importance.rds")
   saveRDS(all_pred_error, "./prediction_combinations/SC1/LOO_CV_RF_pred_error.rds")

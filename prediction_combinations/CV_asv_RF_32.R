@@ -1,5 +1,9 @@
-# One random forest
-# Leave one treatment out per CV
+# Combine predicitons of SC1; CV_asv_RF_32
+# Cross validation by leaving random 1/6 
+# Model per marker
+# Random forest that takes the single cell predictions of the teams, 32 non-predicted markers, treatment and time as variables
+# RF predicts the single cell expression values
+# RF always splits on treatment and time
 
 library(tidyverse)
 library(ranger)
