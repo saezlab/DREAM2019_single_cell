@@ -49,8 +49,8 @@ RF_combination <- read_rds("./submission_data/combination_scoring/SC1/LOO_CV_asv
 
 
 sum_scores_random_teams <- scores_random_teams %>%  group_by(Sample_size) %>%
-	summarise(score_min = min(Median),
-			  score_max = max(Median),
+	summarise(score_min = quantile(Median,0,25),
+			  score_max = quantile(Median,0.75),
 			 score_med = median(Median)) 
 
 ref_numbers <- c(ordered_teams = scores_ordered_teams,
@@ -76,27 +76,30 @@ rank_plot <- bootstrap_RMSE %>%
 	#geom_errorbar(aes(teams,ymin = score_min,ymax=score_max) ,color = my_colors[[1]]) + 
 	geom_point(aes(teams,score_med), color = my_colors[[1]]) + 
 	#geom_line(aes(teams,score_med,group=1), color = my_colors[[1]]) + 
-	# combination of ordered predictions:
-	#geom_point(data =scores_ordered_teams, aes(n,Median),color = my_colors[[2]] ) +
+	
+    # combination of ordered predictions:
+	geom_point(data =scores_ordered_teams, aes(n,Median),color = my_colors[[2]] ) +
 	geom_line(data =scores_ordered_teams, aes(n,Median),color = my_colors[[2]] ) +
-	# combination of random teams
+	
+    # combination of random teams
 	geom_errorbar(data=sum_scores_random_teams, aes(Sample_size,ymin = score_min,ymax=score_max) ,color = my_colors[[3]]) + 
-	#geom_point(data=sum_scores_random_teams, aes(Sample_size,score_med), color = my_colors[[3]]) + 
+	geom_point(data=sum_scores_random_teams, aes(Sample_size,score_med), color = my_colors[[3]]) + 
 	geom_line(data=sum_scores_random_teams, aes(Sample_size,score_med), color = my_colors[[3]]) + 
-	#geom_boxplot(aes(teams, RMSE, group=teams),size=0.2, outlier.size = 0.5) + 
+	
+    #geom_boxplot(aes(teams, RMSE, group=teams),size=0.2, outlier.size = 0.5) + 
 	#geom_hline(yintercept = c(0.74,0.772, 0.91,1.44,2.21)) +
 	#geom_text(data = tibble(x_coord=c(1,1,1,1,1),
 #							y_coord=c(0.74,0.772,1,1.44,2.21),
 #							data_type=c("best in condition prediction","RF all CL","reference","shuffle by condition","shuffle all")),
 #			  aes(x_coord,y_coord,label=data_type), hjust = 0,vjust = 1 )+
 	geom_hline(yintercept = mean(RF_combination$asv_RF_32 ))+
-	ggtitle("Subchallenge I: performance over bootstrap samples") + 
+	#ggtitle("Subchallenge I: performance over bootstrap samples") + 
 	#geom_point(data = SC_leaderboard %>% filter(submitterId %in% ranked_teams), aes(submitterId,score)) +
 	theme_bw() +
 	guides(color="none")+ 
 	theme(axis.text.x = element_blank(),
 		  axis.ticks = element_blank()) + labs(x=NULL) + 
-	coord_cartesian(ylim = c(0.7,1.2))
+	coord_cartesian(ylim = c(0.84,1)) + ylab("Score (RMSE)") 
 print(rank_plot)
 
 # 
