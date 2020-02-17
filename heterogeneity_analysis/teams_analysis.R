@@ -48,32 +48,38 @@ for (j in 1:length(unique(nested_predictions$team))) {
     TR <- conditions$treatment[i]
     print(paste0("iteration: ", i, ". Cell line: ", CL, " and treatment: ", TR))
     
-    dir.create(paste0(TR, "_", CL))
+    # To do UMAP dimensionality reduction and clustering and save result
+    if (FALSE) {
+     dir.create(paste0(TR, "_", CL))
+      
+      cond_data <- team_sub  %>%
+        filter(cell_line == CL & treatment == TR)
+      
+      umap_eu_lin <- umap(as.matrix(select(cond_data, CC_markers)), metric="euclidean", init="PCA", 
+                          n_components = 2, fast_sgd=TRUE, min_dist=0.1)
+      
+      hc_umap <- umap_eu_lin %>%
+        dist(method = "euclidean") %>%
+        fastcluster::hclust(method = "single") %>%
+        cutree(5)
+      
+      cond_data <- cond_data %>% 
+        add_column(V1 = umap_eu_lin[,1], 
+                   V2 = umap_eu_lin[,2],
+                   umap_hc_clust = as.factor(hc_umap))
+      
+      saveRDS(cond_data, paste0(TR, "_", CL, "/", unique(nested_predictions$team)[j], "_sub_clustered.rds"))}
     
-    cond_data <- team_sub  %>%
-      filter(cell_line == CL & treatment == TR)
-    
-    umap_eu_lin <- umap(as.matrix(select(cond_data, CC_markers)), metric="euclidean", init="PCA", 
-                        n_components = 2, fast_sgd=TRUE, min_dist=0.1)
-    
-    hc_umap <- umap_eu_lin %>%
-      dist(method = "euclidean") %>%
-      fastcluster::hclust(method = "single") %>%
-      cutree(5)
-    
-    cond_data <- cond_data %>% 
-      add_column(V1 = umap_eu_lin[,1], 
-                 V2 = umap_eu_lin[,2],
-                 umap_hc_clust = as.factor(hc_umap))
-    
-    saveRDS(cond_data, paste0(TR, "_", CL, "/", unique(nested_predictions$team)[j], "_sub_clustered.rds"))
+    cond_data <- readRDS(paste0(TR, "_", CL, "/", unique(nested_predictions$team)[j], "_sub_clustered.rds"))
     
     pdf(paste0(TR, "_", CL, "/", unique(nested_predictions$team)[j], "_UMAP_HC_clust.pdf"), height = 5, width = 5)
     print(cond_data %>%
             ggplot(aes(x=V1, y=V2, colour=umap_hc_clust)) +
             geom_point(size=0.1) +
-            labs(x = "V1", y = "V2", title= paste0("UMAP colored by HC on first 2 UMAP comps ", CL, ", ", TR)) +
-            guides(colour = guide_legend(override.aes = list(size=4.5)))
+            labs(x = "UMAP V1", y = "UMAP V2", colour = "cluster",
+                 title= paste0("UMAP colored by HC on first 2 UMAP comps ", CL, ", ", TR)) +
+            guides(colour = guide_legend(override.aes = list(size=4.5))) +
+            theme_bw()
     )
     dev.off()
     
@@ -112,26 +118,33 @@ if (TRUE) {
     print(unique(nested_predictions$team)[i])
     team_sub <- pred_sub %>%
       filter(team == unique(nested_predictions$team)[i])
-    umap_eu_lin <- umap(as.matrix(select(team_sub, CC_markers)), metric="euclidean", init="PCA",
-                        n_components = 2, fast_sgd=TRUE, min_dist=0.1)
     
-    hc_umap <- umap_eu_lin %>%
-      dist(method = "euclidean") %>%
-      fastcluster::hclust(method = "single") %>%
-      cutree(5)
+    # To do UMAP dimensionality reduction and clustering and save result
+    if (FALSE) {
+      umap_eu_lin <- umap(as.matrix(select(team_sub, CC_markers)), metric="euclidean", init="PCA",
+                          n_components = 2, fast_sgd=TRUE, min_dist=0.1)
+      
+      hc_umap <- umap_eu_lin %>%
+        dist(method = "euclidean") %>%
+        fastcluster::hclust(method = "single") %>%
+        cutree(5)
+      
+      team_clusters <- team_sub %>%
+        add_column(V1 = umap_eu_lin[,1],
+                   V2 = umap_eu_lin[,2],
+                   umap_hc_clust = as.factor(hc_umap))
+      saveRDS(team_clusters, paste0(unique(nested_predictions$team)[i], "_sub_clustered.rds"))}
     
-    team_clusters <- team_sub %>%
-      add_column(V1 = umap_eu_lin[,1],
-                 V2 = umap_eu_lin[,2],
-                 umap_hc_clust = as.factor(hc_umap))
-    saveRDS(team_clusters, paste0(unique(nested_predictions$team)[i], "_sub_clustered.rds"))
+    team_clusters <- readRDS( paste0(unique(nested_predictions$team)[i], "_sub_clustered.rds"))
     
     pdf(paste0(unique(nested_predictions$team)[i], "_UMAP_HC_clust.pdf"), height = 5, width = 5)
     print(team_clusters %>%
             ggplot(aes(x=V1, y=V2, colour=umap_hc_clust)) +
             geom_point(size=0.1) +
-            labs(x = "V1", y = "V2", title= "UMAP colored by HC on first 2 UMAP comps") +
-            guides(colour = guide_legend(override.aes = list(size=4.5)))
+            labs(x = "UMAP V1", y = "UMAP V2", colour = "cluster",
+                 title= "UMAP colored by HC on first 2 UMAP comps") +
+            guides(colour = guide_legend(override.aes = list(size=4.5))) +
+            theme_bw()
     )
     dev.off()
     

@@ -40,32 +40,38 @@ for (i in 1:dim(conditions)[1]){
   TR <- conditions$treatment[i]
   print(paste0("iteration: ", i, ". Cell line: ", CL, " and treatment: ", TR))
   
-  dir.create(paste0(TR, "_", CL))
   
-  cond_data <- GS_sub  %>%
-    filter(cell_line == CL & treatment == TR)
-  
-  umap_eu_lin <- umap(as.matrix(select(cond_data, CC_markers)), metric="euclidean", init="PCA", 
-                      n_components = 2, fast_sgd=TRUE, min_dist=0.1)
-  
-  hc_umap <- umap_eu_lin %>%
-    dist(method = "euclidean") %>%
-    fastcluster::hclust(method = "single") %>%
-    cutree(5)
-  
-  cond_data <- cond_data %>% 
-    add_column(V1 = umap_eu_lin[,1], 
-               V2 = umap_eu_lin[,2],
+  # To do UMAP dimensionality reduction and clustering and save result
+  if (FALSE) {
+    dir.create(paste0(TR, "_", CL))
+    cond_data <- GS_sub  %>%
+      filter(cell_line == CL & treatment == TR)
+    
+    umap_eu_lin <- umap(as.matrix(select(cond_data, CC_markers)), metric="euclidean", init="PCA", 
+                        n_components = 2, fast_sgd=TRUE, min_dist=0.1)
+    
+    hc_umap <- umap_eu_lin %>%
+      dist(method = "euclidean") %>%
+      fastcluster::hclust(method = "single") %>%
+      cutree(5)
+    
+    cond_data <- cond_data %>% 
+      add_column(V1 = umap_eu_lin[,1], 
+                 V2 = umap_eu_lin[,2],
                umap_hc_clust = as.factor(hc_umap))
+    
+    saveRDS(cond_data, paste0(TR, "_", CL, "/GS_sub_clustered.rds"))}
   
-  saveRDS(cond_data, paste0(TR, "_", CL, "/GS_sub_clustered.rds"))
+  cond_data <- readRDS(paste0(TR, "_", CL, "/GS_sub_clustered.rds"))
   
   pdf(paste0(TR, "_", CL, "/GS_UMAP_HC_clust.pdf"), height = 5, width = 5)
   print(cond_data %>%
           ggplot(aes(x=V1, y=V2, colour=umap_hc_clust)) +
           geom_point(size=0.1) +
-          labs(x = "V1", y = "V2", title= paste0("UMAP colored by HC on first 2 UMAP comps ", CL, ", ", TR)) +
-          guides(colour = guide_legend(override.aes = list(size=4.5)))
+          labs(x = "UMAP V1", y = "UMAP V2", colour = "cluster",
+               title= paste0("UMAP colored by HC on first 2 UMAP comps ", CL, ", ", TR)) +
+          guides(colour = guide_legend(override.aes = list(size=4.5))) +
+          theme_bw()
   )
   dev.off()
   
@@ -98,26 +104,32 @@ GS_sub <- golden_standard %>%
 # Clustering over all cell lines, treatments and timepoints
 # For this step GS_sub is samples with 0.01 per team and condition
 if (TRUE) {
-  umap_eu_lin <- umap(as.matrix(select(GS_sub, CC_markers)), metric="euclidean", init="PCA",
-                      n_components = 2, fast_sgd=TRUE, min_dist=0.1)
+  # To do UMAP dimensionality reduction and clustering and save result
+  if (FALSE) {
+    umap_eu_lin <- umap(as.matrix(select(GS_sub, CC_markers)), metric="euclidean", init="PCA",
+                        n_components = 2, fast_sgd=TRUE, min_dist=0.1)
+    
+    hc_umap <- umap_eu_lin %>%
+      dist(method = "euclidean") %>%
+      fastcluster::hclust(method = "single") %>%
+      cutree(5)
+    
+    GS_clusters <- GS_sub %>%
+      add_column(V1 = umap_eu_lin[,1],
+                 V2 = umap_eu_lin[,2],
+                 umap_hc_clust = as.factor(hc_umap))
+    saveRDS(GS_clusters, "GS_sub_clustered.rds")}
   
-  hc_umap <- umap_eu_lin %>%
-    dist(method = "euclidean") %>%
-    fastcluster::hclust(method = "single") %>%
-    cutree(5)
-  
-  GS_clusters <- GS_sub %>%
-    add_column(V1 = umap_eu_lin[,1],
-               V2 = umap_eu_lin[,2],
-               umap_hc_clust = as.factor(hc_umap))
-  saveRDS(GS_clusters, "GS_sub_clustered.rds")
+  GS_clusters <- readRDS("GS_sub_clustered.rds")
   
   pdf("GS_UMAP_HC_clust.pdf", height = 5, width = 5)
   print(GS_clusters %>%
           ggplot(aes(x=V1, y=V2, colour=umap_hc_clust)) +
           geom_point(size=0.1) +
-          labs(x = "V1", y = "V2", title= "UMAP colored by HC on first 2 UMAP comps") +
-          guides(colour = guide_legend(override.aes = list(size=4.5)))
+          labs(x = "UMAP V1", y = "UMAP V2", colour = "cluster",
+               title= "UMAP colored by HC on first 2 UMAP comps") +
+          guides(colour = guide_legend(override.aes = list(size=4.5))) +
+          theme_bw()
   )
   dev.off()
   
