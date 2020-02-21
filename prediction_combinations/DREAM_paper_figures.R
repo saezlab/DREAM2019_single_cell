@@ -73,8 +73,13 @@ single_scores <- leader_board  %>%
   mutate(model = case_when(model == "single" ~ "predicted winner",
                            TRUE ~ model)) %>%
   arrange(score)
-single_scores$model <- factor(single_scores$model, levels = c(single_scores$model))
-
+single_scores$model <- factor(single_scores$model, levels = c("arbiter", "MDT", "lc_arbiter", "lm", "challenge winner",
+                                                              "predicted winner","stats_lc_arbiter", "stats_RF", 
+                                                              "cond_lm", "cond_RF", "asv_RF_32", "asv_RF_32_Tr", "CV_asv_RF_32"))
+col <- wes_palette(11, name = "Darjeeling1", type = "continuous")
+names(col) <-  c("arbiter", "MDT", "lc_arbiter", "lm", "challenge winner",
+                 "predicted winner","stats_lc_arbiter", "stats_RF", 
+                 "cond_lm", "cond_RF", "asv_RF_32", "asv_RF_32_Tr", "CV_asv_RF_32")
 # The scores when combining the top n performing teams, biased/gold standard
 ordered_scores <- readRDS(file.path(challenge_folder, paste0(subchallenge, "_ordered_combination.rds"))) %>%
   gather(model, score, random_methods) %>%
@@ -91,6 +96,7 @@ if (subchallenge == "SC2") {
     theme_bw() +
     coord_cartesian(clip = "off") +
     geom_boxplot(position = "dodge", show.legend = FALSE) +
+    geom_point(inherit.aes=FALSE, data = leader_board, mapping=aes(x=1, y=score), colour = "#00BFC4", show.legend = FALSE)+
     geom_hline(data = single_scores, mapping = aes(yintercept = score, colour = model), show.legend = FALSE) + 
     ggrepel::geom_text_repel(inherit.aes = FALSE, data = single_scores, aes(label = model, x = 17, y =score, colour = model), 
                              direction = "y", 
@@ -98,7 +104,7 @@ if (subchallenge == "SC2") {
                              segment.size = 0.2,
                              xlim = c(18, 22),
                              ylim = c(20, 80))  +
-    scale_color_manual(values= wes_palette(8, name = "Darjeeling1", type = "continuous"), guide = "none") +
+    scale_color_manual(values= col, guide = "none") +
     geom_point(data=ordered_scores, aes(x=n, y=score, shape = "equal sample", fill = topn_model), size = 2.5, show.legend = FALSE) +
     scale_shape_manual(values = 23) +
     labs(title = subchallenge, x= "Number of combined predictions") +
@@ -112,7 +118,8 @@ if (subchallenge == "SC2") {
     ggplot(aes(as.factor(Sample_size), score, fill = model)) +
     theme_bw() +
     coord_cartesian(clip = "off") +
-    geom_boxplot(position = "dodge", show.legend = FALSE) +
+    geom_boxplot(position = "dodge", show.legend = FALSE)+
+    geom_point(inherit.aes=FALSE, data = leader_board, mapping=aes(x=1, y=score), colour = "#00BFC4", show.legend = FALSE) +
     geom_hline(data = single_scores, mapping = aes(yintercept = score, colour = model), show.legend = FALSE) + 
     ggrepel::geom_text_repel(inherit.aes = FALSE, data = single_scores, aes(label = model, x = 15, y =score, colour = model), 
                              direction = "y", 
@@ -120,7 +127,7 @@ if (subchallenge == "SC2") {
                              segment.size = 0.2,
                              xlim = c(16, 20),
                              ylim = c(50, 150))  +
-    scale_color_manual(values= wes_palette(8, name = "Darjeeling1", type = "continuous"), guide = "none") +
+    scale_color_manual(values= col, guide = "none") +
     geom_point(data=ordered_scores, aes(x=n, y=score, shape = "equal sample", fill = topn_model), size = 2.5, show.legend = FALSE) +
     scale_shape_manual(values = 23) +
     scale_fill_discrete(labels = "equal sample") +
@@ -135,7 +142,8 @@ if (subchallenge == "SC2") {
     ggplot(aes(as.factor(Sample_size), score, fill = model)) +
     theme_bw() +
     coord_cartesian(clip = "off") +
-    geom_boxplot(position = "dodge", show.legend = FALSE)  +
+    geom_boxplot(position = "dodge", show.legend = FALSE) +
+    geom_point(inherit.aes=FALSE, data = leader_board, mapping=aes(x=1, y=score), colour = "#00BFC4", show.legend = FALSE)+
     ylim(NA,1) +
     geom_hline(data = single_scores, mapping = aes(yintercept = score, colour = model), show.legend = FALSE)  +
     ggrepel::geom_text_repel(inherit.aes = FALSE, data = single_scores, aes(label = model, x = 23, y =score, colour = model), 
@@ -145,7 +153,7 @@ if (subchallenge == "SC2") {
                              na.rm = TRUE,
                              xlim = c(24, 28),
                              ylim = c(0, 1))  +
-    scale_color_manual(values= wes_palette(11, name = "Darjeeling1", type = "continuous"), guide = "none") +
+    scale_color_manual(values= col, guide = "none") +
     geom_point(inherit.aes = FALSE, data=ordered_scores, aes(x=n, y=score, shape = topn_model, fill = topn_model), show.legend = FALSE) +
     scale_shape_manual(values = 23) +
     labs(title = subchallenge, x= "Number of combined predictions") +
@@ -158,7 +166,8 @@ if (subchallenge == "SC2") {
     ggplot(aes(as.factor(Sample_size), score, fill = model)) +
     theme_bw() +
     coord_cartesian(clip = "off") +
-    geom_boxplot(position = "dodge", show.legend = FALSE) +
+    geom_boxplot(position = "dodge", show.legend = FALSE)+
+    geom_point(inherit.aes=FALSE, data = leader_board, mapping=aes(x=1, y=score), colour = "#00BFC4", show.legend = FALSE) +
     ylim(NA, 0.47) +
     geom_hline(data = single_scores, mapping = aes(yintercept = score, colour = model), show.legend = FALSE) + 
     ggrepel::geom_text_repel(inherit.aes = FALSE, data = single_scores, aes(label = model, x = 21, y =score, colour = model), 
@@ -167,7 +176,7 @@ if (subchallenge == "SC2") {
                              segment.size = 0.2,
                              xlim = c(22, 27),
                              ylim = c(0.25, 0.45)) +
-    scale_color_manual(values= wes_palette(6, name = "Darjeeling1", type = "continuous"), guide = "none") +
+    scale_color_manual(values=col, guide = "none") +
     geom_point(inherit.aes = FALSE, data=ordered_scores, aes(x=n, y=score, shape = topn_model, fill = topn_model), show.legend = FALSE) +
     scale_shape_manual(values = 23) +
     labs(title = subchallenge, x= "Number of combined predictions") +
@@ -177,4 +186,4 @@ if (subchallenge == "SC2") {
           plot.margin = unit(c(0.1,4,0.1,0.1), "cm"))
 }
 box_plot
-ggsave(paste0(subchallenge, "_scores.pdf"), box_plot, device="pdf", path = "~/Desktop/", width =8.04 , height = 7.67, units="in")
+#ggsave(paste0(subchallenge, "_scores.pdf"), box_plot, device="pdf", path = "~/Desktop/", width =8.04 , height = 7.67, units="in")
