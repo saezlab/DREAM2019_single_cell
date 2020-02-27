@@ -4,7 +4,7 @@ setwd("~/Desktop/BQ internship/DREAM2019_single_cell")
 
 library(tidyverse)
 
-subchallenge <- "SC1"
+subchallenge <- "SC2"
 challenge_folder <- file.path("prediction_combinations", subchallenge)
 
 if (subchallenge == "SC1") {
