@@ -207,7 +207,7 @@ for (i in 1:length(cell_lines)) {
 
 scores <- filter(scores, !is.na(CV_loop))
 
-if (TRUE) {
+if (FALSE) {
   saveRDS(scores, "./prediction_combinations/SC4/LOO_CV_RF_scores.rds")
   saveRDS(feature_importance, "./prediction_combinations/SC4/LOO_CV_RF_feature_importance.rds")
   saveRDS(all_predictions, "./prediction_combinations/SC4/LOO_CV_RF_all_predictions.rds")

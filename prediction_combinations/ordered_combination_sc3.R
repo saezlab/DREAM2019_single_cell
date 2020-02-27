@@ -40,3 +40,8 @@ for (i in 1:length(submissions)) {
 
 all_scores <- all_scores %>% filter(!is.na(n))
 saveRDS(all_scores, "prediction_combinations/SC3/SC3_ordered_combination.rds")
+
+equal_sample_size <- nested_predictions %>%
+  filter(team %in% submissions[2]) %>%
+  unnest(data) %>%
+  score_sc3(validation_data)

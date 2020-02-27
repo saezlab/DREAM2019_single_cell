@@ -7,7 +7,7 @@ setwd("~/Desktop/BQ internship/DREAM2019_single_cell")
 library(tidyverse)
 library(wesanderson)
 
-subchallenge <- "SC4"
+subchallenge <- "SC3"
 challenge_folder <- file.path("prediction_combinations", subchallenge)
 
 if (subchallenge == "SC1") {
@@ -186,4 +186,4 @@ if (subchallenge == "SC2") {
           plot.margin = unit(c(0.1,4,0.1,0.1), "cm"))
 }
 box_plot
-#ggsave(paste0(subchallenge, "_scores.pdf"), box_plot, device="pdf", path = "~/Desktop/", width =8.04 , height = 7.67, units="in")
+ggsave(paste0(subchallenge, "_scores.pdf"), box_plot, device="pdf", path = "~/Desktop/", width =8.04 , height = 7.67, units="in")

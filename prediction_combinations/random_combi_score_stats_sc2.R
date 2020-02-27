@@ -88,12 +88,15 @@ score_per_stat <- score_per_stat %>% unnest() %>% mutate(Sample_size = as.factor
 
 if (FALSE) {saveRDS(score_per_stat, "prediction_combinations/SC2/SC2_random_stat_scores_SSQ.rds")}
 
+score_per_stat <- readRDS("prediction_combinations/SC2/SC2_random_stat_scores_SSQ.rds")
+
 score_per_stat %>%
   gather(stat, score, cov, mean) %>%
   ggplot(aes(Sample_size, score, fill = stat)) +
   geom_boxplot() +
   scale_y_log10() +
-  labs(title = "SC2", x= "Number of combined predictions")
+  labs(title = "SC2", x= "Number of combined predictions") +
+  theme_bw()
 
 score_per_stat %>%
   mutate(score = sqrt(cov+mean)) %>%

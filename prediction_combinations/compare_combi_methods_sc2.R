@@ -12,6 +12,13 @@ setwd("~/Desktop/BQ internship/DREAM2019_single_cell")
 
 source("./scoring_scripts/score_sc2_noFile.R")
 
+
+submission_folder <- "./submission_data/final/SC2"
+
+leaderboard <- read_csv(file.path(submission_folder, "leaderboard_final_sc2.csv"))
+
+submissions <- list.files(submission_folder)
+submissions <- submissions[!startsWith(submissions, "leaderboard")]
 # Sample 10.000 cells from multivarite distribution 
 sample_MVN <- function(means, covs){
   sample <- MASS::mvrnorm(10000, mu = means, Sigma =  covs, tol=0.005) %>%
@@ -37,13 +44,6 @@ required_columns <- c('cell_line','treatment', 'time',
                       'p.p53', 'p.p90RSK', 'p.PDPK1', 'p.RB', 
                       'p.S6', 'p.S6K', 'p.SMAD23', 'p.SRC', 'p.STAT1',
                       'p.STAT3', 'p.STAT5') 
-
-submission_folder <- "./submission_data/final/SC2"
-
-leaderboard <- read_csv(file.path(submission_folder, "leaderboard_final_sc2.csv"))
-
-submissions <- list.files(submission_folder)
-submissions <- submissions[!startsWith(submissions, "leaderboard")]
 
 # Read all predictions
 all_predictions <- lapply(submissions, function(x) {
@@ -181,11 +181,20 @@ for (k in 1:10) {
 }
 overall_scores <- overall_scores %>% dplyr::filter(!is.na(iteration))
 
-saveRDS(overall_scores, "./prediction_combinations/SC2/combi_methods_sampleStats_N10_scores.rds")
+if (FALSE) {saveRDS(overall_scores, "./prediction_combinations/SC2/combi_methods_N10_scores.rds")}
 
+overall_scores <- readRDS("./prediction_combinations/SC2/combi_methods_N10_scores.rds")
 
-
-
-
-
+overall_scores %>%
+  gather(method, score, c(mean_stats, median_stats,weighted_stats, equal_sample, weighted_sample)) %>%
+  ggplot(aes(method, score, fill = method)) +
+  theme_bw() +
+  geom_boxplot(position = "dodge")
+  
+overall_scores %>%
+  gather(method, score, c(mean_stats, median_stats,weighted_stats, equal_sample, weighted_sample)) %>%
+  ggplot(aes(iteration, score, fill = method)) +
+  theme_bw() +
+  geom_bar(stat="identity", position = "dodge") +
+  labs(fill = "combination\nmethod")
 
