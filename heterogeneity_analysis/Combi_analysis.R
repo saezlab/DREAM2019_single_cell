@@ -9,7 +9,7 @@
 
 library(tidyverse)
 library(uwot)
-library(fastcluster)
+library(dbscan)
 library(ComplexHeatmap)
 
 setwd("~/Desktop/BQ internship/DREAM2019_single_cell")
@@ -25,8 +25,8 @@ combi <- readRDS("./prediction_combinations/SC2/L2O_CV_all_predictions.rds")
 CC_markers <- c("Ki.67", "CyclinB", "GAPDH", "IdU", "p.RB", "cleavedCas", "p.H3")
 
 dir.create("./heterogeneity_analysis")
-dir.create("./heterogeneity_analysis/SC2")
-setwd("./heterogeneity_analysis/SC2")
+dir.create("./heterogeneity_analysis/SC2/HDB")
+setwd("./heterogeneity_analysis/SC2/HDB")
 
 combi_sub <- combi %>%
   group_by(model, cell_line, treatment, time) %>%
@@ -52,7 +52,7 @@ for (j in 1:length(unique(combi$model))) {
     print(paste0("iteration: ", i, ". Cell line: ", CL, " and treatment: ", TR))
     
     # To do UMAP dimensionality reduction and clustering and save result
-    if (FALSE) {
+    if (TRUE) {
     dir.create(paste0(TR, "_", CL))
     cond_data <- model_sub  %>%
       filter(cell_line == CL & treatment == TR)
@@ -60,26 +60,24 @@ for (j in 1:length(unique(combi$model))) {
     umap_eu_lin <- umap(as.matrix(select(cond_data, CC_markers)), metric="euclidean", init="PCA", 
                         n_components = 2, fast_sgd=TRUE, min_dist=0.1)
     
-    hc_umap <- umap_eu_lin %>%
-      dist(method = "euclidean") %>%
-      fastcluster::hclust(method = "single") %>%
-      cutree(5)
+    hdb_umap <- umap_eu_lin %>%
+      hdbscan(minPts=20)
     
     cond_data <- cond_data %>% 
       add_column(V1 = umap_eu_lin[,1], 
                  V2 = umap_eu_lin[,2],
-                 umap_hc_clust = as.factor(hc_umap))
+                 umap_hdb_clust = as.factor(hdb_umap$cluster))
     
     saveRDS(cond_data, paste0(TR, "_", CL, "/", model, "_sub_clustered.rds"))}
     
     cond_data <- readRDS( paste0(TR, "_", CL, "/", model, "_sub_clustered.rds"))
     
-    pdf(paste0(TR, "_", CL, "/", model, "_UMAP_HC_clust.pdf"), height = 5, width = 5)
+    pdf(paste0(TR, "_", CL, "/", model, "_UMAP_HDB_clust.pdf"), height = 5, width = 5)
     print(cond_data %>%
-            ggplot(aes(x=V1, y=V2, colour=umap_hc_clust)) +
+            ggplot(aes(x=V1, y=V2, colour=umap_hdb_clust)) +
             geom_point(size=0.1) +
             labs(x = "UMAP V1", y = "UMAP V2", 
-                 title= paste0("UMAP colored by HC on first 2 UMAP comps ", CL, ", ", TR),
+                 title= paste0("UMAP colored by HDB on first 2 UMAP comps ", CL, ", ", TR),
                  colour = "cluster") +
             guides(colour = guide_legend(override.aes = list(size=4.5))) +
             theme_bw()
@@ -88,21 +86,21 @@ for (j in 1:length(unique(combi$model))) {
     
     hm <- cond_data %>% 
       gather(marker, marker_value, markers) %>%
-      group_by(umap_hc_clust, marker) %>%
+      group_by(umap_hdb_clust, marker) %>%
       summarise(median_value = median(marker_value)) %>%
-      spread(umap_hc_clust, median_value)
+      spread(umap_hdb_clust, median_value)
     
-    pdf(paste0(TR, "_", CL, "/", model, "_UMAP_HC_clust_HM.pdf"), height = 8, width = 4)
+    pdf(paste0(TR, "_", CL, "/", model, "_UMAP_HDB_clust_HM.pdf"), height = 8, width = 4)
     print(Heatmap(as.matrix(select(hm, -marker)), right_annotation = rowAnnotation(marker = anno_text(hm$marker)), 
-                  col = RColorBrewer::brewer.pal(9, "YlOrRd"), column_title = paste0("HC-UMAP clustering, ", CL, ", ", TR), 
-                  bottom_annotation = HeatmapAnnotation(cluster_size = anno_barplot(count(cond_data, umap_hc_clust)$n)))
+                  col = RColorBrewer::brewer.pal(9, "YlOrRd"), column_title = paste0("HDB-UMAP clustering, ", CL, ", ", TR), 
+                  bottom_annotation = HeatmapAnnotation(cluster_size = anno_barplot(count(cond_data, umap_hdb_clust)$n)))
     )
     dev.off()
   }
 }
 
 # Analyse all confition together
-setwd("~/Desktop/BQ internship/DREAM2019_single_cell/heterogeneity_analysis/SC2")
+setwd("~/Desktop/BQ internship/DREAM2019_single_cell/heterogeneity_analysis/SC2/HDB")
 dir.create("all_conditions")
 setwd("./all_conditions")
 
@@ -121,30 +119,28 @@ if (TRUE) {
     print(i)
     model <- unique(combi$model)[i]
     # To do UMAP dimensionality reduction and clustering and save result
-    if (FALSE) {
+    if (TRUE) {
     model_sub <- combi_sub %>%
       filter(model == unique(combi$model)[i])
     umap_eu_lin <- umap(as.matrix(select(combi_sub, CC_markers)), metric="euclidean", init="PCA",
                         n_components = 2, fast_sgd=TRUE, min_dist=0.1)
 
-    hc_umap <- umap_eu_lin %>%
-      dist(method = "euclidean") %>%
-      fastcluster::hclust(method = "single") %>%
-      cutree(5)
+    hdb_umap <- umap_eu_lin %>%
+      hdbscan(minPts=20)
 
     combi_clusters <- combi_sub %>%
       add_column(V1 = umap_eu_lin[,1],
                  V2 = umap_eu_lin[,2],
-                 umap_hc_clust = as.factor(hc_umap))
+                 umap_hdb_clust = as.factor(hdb_umap$cluster))
     saveRDS(combi_clusters, paste0(unique(combi$model)[i], "_sub_clustered.rds"))}
     combi_clusters <- readRDS(paste0(unique(combi$model)[i], "_sub_clustered.rds"))
     
-    pdf(paste0(model, "_UMAP_HC_clust.pdf"), height = 5, width = 5)
+    pdf(paste0(model, "_UMAP_HDB_clust.pdf"), height = 5, width = 5)
     print(combi_clusters %>%
-            ggplot(aes(x=V1, y=V2, colour=umap_hc_clust)) +
+            ggplot(aes(x=V1, y=V2, colour=umap_hdb_clust)) +
             geom_point(size=0.1) +
             labs(x = "UMAP V1", y = "UMAP V2", colour = "cluster",
-                 title= "UMAP colored by HC on first 2 UMAP comps") +
+                 title= "UMAP colored by HDB on first 2 UMAP comps") +
             guides(colour = guide_legend(override.aes = list(size=4.5))) +
             theme_bw()
     )
@@ -152,14 +148,14 @@ if (TRUE) {
     
     hm <- combi_clusters %>% 
       gather(marker, marker_value, markers) %>%
-      group_by(umap_hc_clust, marker) %>%
+      group_by(umap_hdb_clust, marker) %>%
       summarise(median_value = median(marker_value)) %>%
-      spread(umap_hc_clust, median_value)
+      spread(umap_hdb_clust, median_value)
     
-    pdf(paste0(model, "_UMAP_HC_clust_HM.pdf"), height = 8, width = 4)
+    pdf(paste0(model, "_UMAP_HDB_clust_HM.pdf"), height = 8, width = 4)
     print(Heatmap(as.matrix(select(hm, -marker)), right_annotation = rowAnnotation(marker = anno_text(hm$marker)), 
-                  col = RColorBrewer::brewer.pal(9, "YlOrRd"), column_title = "HC-UMAP clustering", 
-                  bottom_annotation = HeatmapAnnotation(cluster_size = anno_barplot(count(combi_clusters, umap_hc_clust)$n)))
+                  col = RColorBrewer::brewer.pal(9, "YlOrRd"), column_title = "HDB-UMAP clustering", 
+                  bottom_annotation = HeatmapAnnotation(cluster_size = anno_barplot(count(combi_clusters, umap_hdb_clust)$n)))
     )
     dev.off()
   }
