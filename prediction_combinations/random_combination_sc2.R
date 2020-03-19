@@ -13,19 +13,8 @@ setwd("~/Desktop/BQ internship/DREAM2019_single_cell")
 # Scoring function wtth input a tibble, not a csv file
 source("./scoring_scripts/score_sc2_noFile.R")
 
-required_columns <- c('cell_line','treatment', 'time',
-                      'b.CATENIN', 'cleavedCas', 'CyclinB', 'GAPDH', 'IdU',
-                      'Ki.67', 'p.4EBP1', 'p.Akt.Ser473.', 'p.AKT.Thr308.',
-                      'p.AMPK', 'p.BTK', 'p.CREB', 'p.ERK', 'p.FAK', 'p.GSK3b',
-                      'p.H3', 'p.JNK', 'p.MAP2K3', 'p.MAPKAPK2',
-                      'p.MEK', 'p.MKK3.MKK6', 'p.MKK4', 'p.NFkB', 'p.p38',
-                      'p.p53', 'p.p90RSK', 'p.PDPK1', 'p.RB', 
-                      'p.S6', 'p.S6K', 'p.SMAD23', 'p.SRC', 'p.STAT1',
-                      'p.STAT3', 'p.STAT5') 
-
 validation_data <- read_csv("./challenge_data/validation_data/sc2gold.csv") %>% select(required_columns)
-submission_folder <- "./submission_data/final/SC2"
-leader_board <- read_csv(file.path(submission_folder, "leaderboard_final_sc2.csv"))
+leader_board <- read_csv("./submission_data/final/SC2/leaderboard_final_sc2.csv")
 
 # The predicted cells of the teams, nested so team-cell_line-Tr-Time-dataframe with predictions 
 nested_predictions <- readRDS("./submission_data/intermediate_data/sc2_all_predictions_nested.rds") %>%

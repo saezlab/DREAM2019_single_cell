@@ -42,18 +42,6 @@ nested_predictions <- readRDS("./submission_data/intermediate_data/sc2_all_predi
 
 cell_lines <- unique(sub_data_values$cell_line) %>% 
   sample(12, replace = FALSE) # randomise order
-if (FALSE) {
-# Each row represents a unique combination of two cell lines
-# Each row will be used as validation cell lines once
-  CL_combi <- expand.grid(cell_lines, cell_lines) %>% 
-    as_tibble() %>%
-    mutate(Var1 = as.character(Var1), Var2 = as.character(Var2)) %>%
-    filter(! Var1 == Var2) %>%
-    group_by(grp = paste(pmax(Var1, Var2), pmin(Var1, Var2), sep = "_")) %>%
-    slice(1) %>%
-    ungroup() %>%
-    select(-grp)
-}
 
 np_markers <- colnames(sub_data_err)[!colnames(sub_data_err) %in% c("cell_line", "treatment",
                                                                     "time", "best_sub", 
@@ -96,18 +84,6 @@ for (i in seq(1, by=2, len= 0.5*length(cell_lines))) {
   
   ## Train models
   # Meta Decision Tree
-  if (FALSE) {
-  MDT_train <- train_data_err %>% 
-    group_by(treatment, time, best_sub) %>% 
-    summarise(n=n()) %>%
-    arrange(treatment, time, n) %>% 
-    top_n(1) %>%
-    group_by(treatment, time)  %>%
-    mutate(n=n()) %>%
-    nest(best_sub)  %>%
-    mutate(sel_sub = map(data, ~.[sample(1:n, 1),])) %>% 
-    select(-c(n, data)) %>% 
-    unnest() } # If there is no distinguishing data for conditions
   features <- paste(feature_count$feature, collapse = "+")
   MDT <- rpart(paste0("best_sub ~", features), data=train_data_err, method="class",
                control = rpart.control(minsplit=10))

@@ -46,8 +46,6 @@ for (n in 2:length(submissions)) {
   
 }
 
-#colnames(repeated_scores) <- c("Mean", "Median", "Weighted")
-#repeated_scores <- repeated_scores %>% as_tibble()
 if (FALSE) {saveRDS(repeated_scores, "prediction_combinations/SC1/SC1_random_subs_scores.rds")}
 
 scores <- readRDS("prediction_combinations/SC1/SC1_random_subs_scores.rds")

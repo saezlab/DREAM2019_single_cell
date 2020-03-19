@@ -73,12 +73,17 @@ sub_data_err <- sub_data_err %>% full_join(all_median) %>%
 sub_data_median <- sub_data_median %>% full_join(all_median) %>%
   select(cell_line, treatment, time, marker, np_markers, standard, submissions)
 sub_data_all <- sub_data_all %>% full_join(all_cell_line_data)
+sub_data_nested <- sub_data_all %>%
+  select(-np_markers) %>%
+  gather(team, prediction, submissions) %>%
+  group_by(team, cell_line, treatment, time, marker) %>%
+  nest()
 
 # Save the data used to train models
 saveRDS(sub_data_err, "./submission_data/intermediate_data/sc1_condErr_medianVals.rds")
 saveRDS(sub_data_median, "./submission_data/intermediate_data/sc1_median_conditions_np.rds")
 saveRDS(sub_data_all, "./submission_data/intermediate_data/sc1_all_NP_predictions.rds")
-
+saveRDS(sub_data_nested, "./submission_data/intermediate_data/sc1_all_predictions_nested.rds")
 
 
 

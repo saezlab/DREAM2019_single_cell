@@ -23,7 +23,7 @@ repeated_scores <- tibble("Sample_size" = rep(1, 100), "Iteration" = seq(1,100),
 for (n in 2:length(submissions)) {
 
   n_samples <- n
-  n_iter<- 10
+  n_iter<- 100
 
   for (j in 1:n_iter) {
     print(paste0("samples: :", n_samples, " iteration: ", j))

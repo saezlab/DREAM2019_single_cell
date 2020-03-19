@@ -1,5 +1,9 @@
-# One random forest
-# Leave one treatment out per CV
+# Combine predicitons of SC1; asv_RF_32
+# Cross validation based on cell line
+# Model per marker
+# Random forest that takes the single cell predictions of the teams, 32 non-predicted markers, treatment and time as variables
+# RF predicts the single cell expression values
+# RF always splits on treatment and time
 
 library(tidyverse)
 library(ranger)
@@ -8,30 +12,19 @@ setwd("~/Desktop/BQ internship/DREAM2019_single_cell")
 
 # Participating team names
 submissions <-  readRDS("./submission_data/intermediate_data/sc1_ranked_teams.rds") %>% as.character()
-
+# Median prediction per team per condition (cell line, treatment, time, marker) and the median values of 32 non predicted markers\)
+sub_data_median <- readRDS("./submission_data/intermediate_data/sc1_median_conditions_np.rds")
+# Error per team per condition (cell line, treatment, time, marker) and the median values of 32 non predicted markers. 
+# Mean of error is final scorre
+sub_data_err <- readRDS( "./submission_data/intermediate_data/sc1_condErr_medianVals.rds")  %>%
+  mutate_if(is.character, as.factor)
 # All single cell predictions of all teams and true values (standard) as well as 32 marker values of non predicted markers
 sub_data_all <- readRDS("./submission_data/intermediate_data/sc1_all_NP_predictions.rds")  %>%
   mutate_if(is.character, as.factor) %>%
   group_by(treatment, time, marker) %>%
   mutate(n=n()) %>%
   ungroup() %>%
-  mutate(n = ifelse(n<500, n, 500)) 
-
-# Make CV folds based on treatment
-sub_data_CV <- sub_data_all %>%
-  group_by(treatment) %>%
-  mutate(CV_loop = case_when(treatment == "EGF" ~ 1,
-                             treatment == "full" ~ 2,
-                             treatment == "iEGFR" ~ 3,
-                             treatment == "iMEK" ~ 4,
-                             treatment == "iPI3K" ~ 5,
-                             treatment == "iPKC" ~ 6))
-
-# Check CV folds
-sub_data_CV %>% ungroup() %>% unite("ID", cell_line, treatment, time, marker, sep="_") %>%select(ID, CV_loop) %>%
-  table()
-sub_data_CV %>% filter(treatment == "EGF") %>% select(CV_loop) %>% unique()
-
+  mutate(n = ifelse(n<500, n, 500))
 
 np_markers <- c("b.CATENIN", "cleavedCas", "CyclinB", "GAPDH", "IdU", "Ki.67", "p.4EBP1", 
                 "p.AKT.Thr308.", "p.AMPK", "p.BTK", "p.CREB", "p.FAK", "p.GSK3b", "p.H3", "p.JNK",
@@ -39,27 +32,27 @@ np_markers <- c("b.CATENIN", "cleavedCas", "CyclinB", "GAPDH", "IdU", "Ki.67", "
                 "p.p90RSK", "p.PDPK1", "p.RB", "p.S6K", "p.SMAD23", "p.SRC", "p.STAT1", "p.STAT3", 
                 "p.STAT5")
 
-cell_lines <- unique(sub_data_all$cell_line)
+cell_lines <- unique(sub_data_err$cell_line)
 
 # Keep track of scores per CV loop
 scores <- tibble("CV_loop" = NA,
                  "val_CL" = NA,
-                 "asv_RF_32_Tr" = NA)
+                 "asv_RF_32" = NA)
 
 # Save predicted values 
 asv_RF_32_predictions <- tibble()
 
 # Save error per condition of predictions
 asv_RF_32_pred_errors <- tibble()
-for (i in 1:6) {
+for (i in 1:length(cell_lines)) {
   
   print(paste("Iteration ", i, " out of ", length(cell_lines), ".", sep = ""))
-
-  train_data_all <- sub_data_CV %>% 
-    filter(CV_loop != i) %>%
+  
+  train_data_all <- sub_data_all %>% 
+    filter(!cell_line %in% cell_lines[i]) %>%
     arrange(cell_line, treatment, time, marker)
-  val_data_all <- sub_data_CV %>%
-    filter(CV_loop == i) %>%
+  val_data_all <- sub_data_all %>%
+    filter(cell_line %in% cell_lines[i]) %>%
     arrange(cell_line, treatment, time, marker) 
   
   # Random forest
@@ -74,8 +67,8 @@ for (i in 1:6) {
     nest() %>%
     mutate(RF = map(data, ~ranger(as.formula(RF_formula), data = ., importance = "impurity", 
                                   max.depth = 6, always.split.variables = c("treatment", "time"))))
-
-
+  
+  
   # Predict and score RF
   RF_pred <- val_data_all %>%
     group_by(marker) %>%
@@ -101,15 +94,14 @@ for (i in 1:6) {
   
   # Keep track of scores per CV loop
   scores <- scores %>% add_row("CV_loop" = i,
-                   "val_CL" = cell_lines[i],
-                   "asv_RF_32_Tr" = RF_val_score)
+                               "val_CL" = cell_lines[i],
+                               "asv_RF_32" = RF_val_score)
   
 }
-scores <- filter(scores, !is.na(CV_loop))
-asv_RF_32_predictions <- asv_RF_32_predictions %>% select(-CV_loop)
-if (FALSE) {
-  saveRDS(scores, "./prediction_combinations/SC1/Tr_CV_asvRF_incl32_scores.rds")
-  saveRDS(asv_RF_32_predictions, "./prediction_combinations/SC1/Tr_CV_asvRF_incl32_all_predictions.rds")
-  saveRDS(asv_RF_32_pred_errors, "./prediction_combinations/SC1/Tr_CV_asvRF_incl32_pred_errors.rds")}
-
+scores <- filter(scores, !is.na(CV_loop)) 
+if(FALSE){
+  saveRDS(scores, "./prediction_combinations/SC1/LOO_CV_asvRF_incl32_scores.rds")
+  saveRDS(asv_RF_32_predictions, "./prediction_combinations/SC1/LOO_CV_asvRF_incl32_all_predictions.rds")
+  saveRDS(asv_RF_32_pred_errors, "./prediction_combinations/SC1/LOO_CV_asvRF_incl32_pred_errors.rds")
+}
 
