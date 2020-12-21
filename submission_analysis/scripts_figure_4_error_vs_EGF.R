@@ -57,10 +57,10 @@ sc3_cl_stats <- complete_CL %>%
     filter(cell_line %in% SC3_cell_lines) %>% # filter out the cell-lines not used
     #slice(1:1) %>% 
     mutate(data_stats = map(path,read_to_stats)) 
-
-sc3_cl_stats <- sc3_cl_stats %>% select(cell_line,data_stats) %>%
+    
+sc3_cl_stats <- sc3_cl_stats %>% select(data_stats) %>%
     unnest(data_stats) 
-sc3_cl_stats <- sc3_cl_stats %>% select(-cell_line1)
+
 
 
 ###############################################################################

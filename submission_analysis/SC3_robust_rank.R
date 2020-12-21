@@ -100,10 +100,6 @@ gs <- read_to_stats("./challenge_data/validation_data/sc3gold.csv") %>%
 
 combined_statistics <- bind_cols(gs,ordered_predictions)
 
-# calculate the RMSE error for each conditions for each team. 
-RMSE_conditions <- combined_statistics %>% 
-	#group_by(cell_line, treatment, time, marker) %>%
-	summarise_at(as.character(ranked_teams),~ sqrt(sum((standard - .)^2)))
 
 
 ## Bootstrapping: 

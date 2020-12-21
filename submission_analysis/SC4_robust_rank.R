@@ -34,7 +34,7 @@ SC_leaderboard = read_csv(file.path(submission_folder,"leaderboard_final_sc4.csv
 	mutate(submitterId = make.names(submitterId))
 
 # we take a subset of teams from the top of the rankings. 
-N_top <- 20
+N_top <- nrow(SC_leaderboard)
 
 ranked_teams <- factor(SC_leaderboard$submitterId[1:N_top],levels = SC_leaderboard$submitterId[1:N_top])
 

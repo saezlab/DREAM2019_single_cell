@@ -71,8 +71,8 @@ bootstrap_RMSE %>%
                                   score_med = median(RMSE),
                                   score_mean = mean(RMSE),
                                   score_std = sd(RMSE)) 
-    
-    
+
+
 # process combinations:
 sum_scores_random_teams <- scores_random_teams %>%  group_by(Sample_size) %>%
     summarise(score_min = quantile(Median,0,25),
@@ -91,7 +91,7 @@ rank_plot <- conditional_error_stats %>%
     summarise(score = sqrt(sum(cond_score))) %>% 
     ungroup() %>%
     mutate(teams = factor(teams,levels = levels(ranked_teams))) %>%
-# bootstrap_RMSE %>% 
+    # bootstrap_RMSE %>% 
     # gather(teams,RMSE,-BS_sample) %>%
     # group_by(teams) %>% summarise(score_min = min(RMSE),
     #                               score_max = max(RMSE),
@@ -112,7 +112,6 @@ rank_plot <- conditional_error_stats %>%
     geom_line(data=sum_scores_random_teams, aes(Sample_size,score_med), color = my_colors[[3]]) + 
     geom_hline(data=NULL,aes(yintercept = mean(RF_combination$stats_RF), color = "RF combination"))+
     geom_hline(data=NULL,aes(yintercept = 29.1559, color = "EGF prediction"))+
-    
     theme_bw() +
     theme(
         axis.text.x = element_blank(),
@@ -132,8 +131,9 @@ rank_plot <- conditional_error_stats %>%
                                   "combination top N" = my_colors[[2]],
                                   "random combination" = my_colors[[3]],
                                   "EGF prediction" = my_colors[[4]],
-                                  "RF combination" = my_colors[[5]]))
-    
+                                  "RF combination" = my_colors[[5]],
+                                  "baseline model" = my_colors[[6]]))
+
 print(rank_plot)
 
 
@@ -187,3 +187,214 @@ plot_grid(rank_plot,
           axis = "lr", align = "v", rel_heights =  c(1.5, 1, .7), ncol = 1)
 ggsave("./publication/figures/figure3/sc2_leaderboard_anonym.pdf", width = 6,height = 5)
 
+
+
+
+#### Simplified leaderboard:
+
+### leaderboard plot, teams by number, violin plot, no combinations
+hide_names <- tibble(teams = ranked_teams, alt_name = as.character(1:length(ranked_teams)))
+hide_names$alt_name = factor(hide_names$alt_name,levels =hide_names$alt_name)
+
+rank_plot <- bootstrap_RMSE %>% 
+    gather(teams,rmse,-BS_sample) %>% 
+    mutate(teams = factor(teams,levels = levels(ranked_teams))) %>%
+    left_join(hide_names,by="teams") %>% 
+    select(-teams) %>%
+    ggplot() +
+    # individual performance:
+    geom_violin(aes(alt_name,rmse,fill="team prediction"),draw_quantiles = 0.5) + 
+    geom_hline(data=NULL,aes(yintercept = 29.1559, color = "EGF prediction"))+
+    geom_hline(data=NULL,aes(yintercept = 44.6702, color = "reference"))+
+    theme_bw() +
+    theme(# axis.text.x = element_blank(),
+        # axis.ticks.x = element_blank(),
+        panel.grid = element_blank(),
+        legend.position = c(0.2,0.6),
+        legend.title = element_blank(),
+        legend.margin = margin(0, 0, 0, 0),
+        #legend.background = element_blank(),
+        legend.box.margin =  margin(0, 0, 0, 0),
+        legend.spacing.y = unit(0.05, 'cm')) +
+    xlab("Teams") + 
+    #coord_cartesian(ylim = c(20,100)) +
+    ylab("Score (Median, Cov)") +
+    scale_color_manual(values = c("reference" = my_colors[[3]],
+                                  "EGF prediction" = my_colors[[4]])) +
+    scale_fill_manual(values = c("team prediction"= my_colors[[1]])) 
+print(rank_plot)
+
+
+ggsave("./publication/figures/figure3/sc2_leaderboard_anonym_rank_only_nocombination.pdf", width = 6,height = 3)
+
+
+########## simplified
+
+
+hide_names <- tibble(teams = ranked_teams, alt_name = as.character(1:length(ranked_teams)))
+hide_names$alt_name = factor(hide_names$alt_name,levels =hide_names$alt_name)
+
+
+
+bootstrap_RMSE %>% 
+    gather(teams,rmse,-BS_sample) %>% 
+    mutate(teams = factor(teams,levels = levels(ranked_teams))) %>%
+    left_join(hide_names,by="teams") %>% 
+    select(-teams) %>%
+    # bootstrap_RMSE %>% 
+    # gather(teams,RMSE,-BS_sample) %>%
+    # group_by(teams) %>% summarise(score_min = min(RMSE),
+    #                               score_max = max(RMSE),
+    #                               score_med = median(RMSE)) %>% 
+    # ungroup() %>%
+    # mutate(teams = factor(teams,levels = levels(ranked_teams))) %>%
+    ggplot() +
+    # individual performance:
+    geom_violin(aes(alt_name,rmse,col="team prediction"),draw_quantiles = 0.5) + 
+    
+    # combination of ordered predictions:
+    #geom_point(data =scores_ordered_teams, aes(n,median_stats,color="combination top N")) +
+    #geom_line(data =scores_ordered_teams, aes(n,median_stats,color="combination top N")) +
+    
+    # combination of random teams
+    # geom_errorbar(data=sum_scores_random_teams, aes(Sample_size,ymin = score_min,ymax=score_max) ,color = my_colors[[3]]) + 
+    # geom_point(data=sum_scores_random_teams, aes(Sample_size,score_med,color = "random combination")) + 
+    # geom_line(data=sum_scores_random_teams, aes(Sample_size,score_med), color = my_colors[[3]]) + 
+    # geom_hline(data=NULL,aes(yintercept = mean(RF_combination$stats_RF), color = "RF combination"))+
+    geom_hline(data=NULL,aes(yintercept = 29.1559, color = "EGF prediction"))+
+    
+    theme_bw() +
+    theme(
+        # axis.text.x = element_blank(),
+        # axis.ticks.x = element_blank(),
+        #panel.grid = element_blank(),
+        #legend.position = c(0.2, 0.85),
+        legend.position = "left",
+        legend.title = element_blank(),
+        legend.margin = margin(0, 0, 0, 0),
+        #legend.background = element_blank(),
+        legend.box.margin =  margin(0, 0, 0, 0),
+        legend.spacing.y = unit(0.05, 'cm')) +
+    xlab("Teams") + 
+    coord_cartesian(ylim = c(20,100)) +
+    ylab("Score (Median, Cov)") +
+    scale_color_manual(values = c("team prediction"=my_colors[[1]],
+                                  "combination top N" = my_colors[[2]],
+                                  "random combination" = my_colors[[3]],
+                                  "EGF prediction" = my_colors[[4]],
+                                  "RF combination" = my_colors[[5]]))
+
+
+
+ggsave("./publication/slides/sc2_leaderboard.pdf", width = 6,height = 3)
+
+
+
+#### Plotting only the ranking:
+hide_names <- tibble(teams = ranked_teams, alt_name = as.character(1:length(ranked_teams)))
+hide_names$alt_name = factor(hide_names$alt_name,levels =hide_names$alt_name)
+
+
+
+bootstrap_RMSE %>% 
+    gather(teams,rmse,-BS_sample) %>% 
+    mutate(teams = factor(teams,levels = levels(ranked_teams))) %>%
+    left_join(hide_names,by="teams") %>% 
+    select(-teams) %>%
+    # bootstrap_RMSE %>% 
+    # gather(teams,RMSE,-BS_sample) %>%
+    # group_by(teams) %>% summarise(score_min = min(RMSE),
+    #                               score_max = max(RMSE),
+    #                               score_med = median(RMSE)) %>% 
+    # ungroup() %>%
+    # mutate(teams = factor(teams,levels = levels(ranked_teams))) %>%
+    ggplot() +
+    # individual performance:
+    geom_violin(aes(alt_name,rmse,col="team prediction"),draw_quantiles = 0.5) + 
+    
+    # combination of ordered predictions:
+    geom_point(data =scores_ordered_teams, aes(n,median_stats,color="combination top N")) +
+    geom_line(data =scores_ordered_teams, aes(n,median_stats,color="combination top N")) +
+    
+    # combination of random teams
+    # geom_errorbar(data=sum_scores_random_teams, aes(Sample_size,ymin = score_min,ymax=score_max) ,color = my_colors[[3]]) + 
+    # geom_point(data=sum_scores_random_teams, aes(Sample_size,score_med,color = "random combination")) + 
+    # geom_line(data=sum_scores_random_teams, aes(Sample_size,score_med), color = my_colors[[3]]) + 
+    geom_hline(data=NULL,aes(yintercept = mean(RF_combination$stats_RF), color = "RF combination"))+
+    geom_hline(data=NULL,aes(yintercept = 29.1559, color = "EGF prediction"))+
+    
+    theme_bw() +
+    theme(
+        # axis.text.x = element_blank(),
+        # axis.ticks.x = element_blank(),
+        #panel.grid = element_blank(),
+        #legend.position = c(0.2, 0.85),
+        legend.position = "left",
+        legend.title = element_blank(),
+        legend.margin = margin(0, 0, 0, 0),
+        #legend.background = element_blank(),
+        legend.box.margin =  margin(0, 0, 0, 0),
+        legend.spacing.y = unit(0.05, 'cm')) +
+    xlab("Teams") + 
+    coord_cartesian(ylim = c(20,100)) +
+    ylab("Score (Median, Cov)") +
+    scale_color_manual(values = c("team prediction"=my_colors[[1]],
+                                  "combination top N" = my_colors[[2]],
+                                  "random combination" = my_colors[[3]],
+                                  "EGF prediction" = my_colors[[4]],
+                                  "RF combination" = my_colors[[5]]))
+
+
+ggsave("./publication/figures/figure3/sc2_leaderboard_nomethods.pdf", width = 6,height = 3)
+
+
+
+
+### Combination of predictions ------------
+
+
+
+ggplot() +
+    # combination of ordered predictions:
+    geom_point(data =scores_ordered_teams, aes(n,median_stats,color="combination top N")) +
+    geom_line(data =scores_ordered_teams, aes(n,median_stats,color="combination top N")) +
+    
+    # combination of random teams
+    geom_errorbar(data=sum_scores_random_teams, aes(Sample_size,ymin = score_min,ymax=score_max) ,color = my_colors[[3]]) + 
+    geom_point(data=sum_scores_random_teams, aes(Sample_size,score_med,color = "random combination")) + 
+    geom_line(data=sum_scores_random_teams, aes(Sample_size,score_med), color = my_colors[[3]]) + 
+    geom_hline(data=NULL,aes(yintercept = mean(RF_combination$stats_RF), color = "RF combination"))+
+    geom_hline(data=NULL,aes(yintercept = 29.1559, color = "EGF prediction"))+
+    geom_hline(data=NULL,aes(yintercept = 23.2, color = "challenge winner"))+
+    theme_bw() +
+    theme(
+        #axis.text.x = element_blank(),
+        #axis.ticks.x = element_blank(),
+        panel.grid = element_blank(),
+        legend.position = c(0.5, 0.75),
+        #legend.position = "left",
+        legend.title = element_blank(),
+        legend.margin = margin(0, 0, 0, 0),
+        #legend.background = element_blank(),
+        legend.box.margin =  margin(0, 0, 0, 0),
+        legend.spacing.y = unit(0.05, 'cm')) +
+    
+    xlab("Number of teams") +
+    ylab("Score (Median, Cov)") +
+    scale_color_manual(values = c("challenge winner"=my_colors[[1]],
+                                  "combination top N" = my_colors[[2]],
+                                  "random combination" = my_colors[[3]],
+                                  "EGF prediction" = my_colors[[4]],
+                                  "RF combination" = my_colors[[7]],
+                                  "baseline model" = my_colors[[6]]))
+
+ggsave("./publication/figures/figure3/sc2_prediction_combinations.pdf", width = 6,height = 3)
+
+
+
+
+
+##3
+
+
+1- scores_ordered_teams $median_stats / scores_ordered_teams $median_stats[[1]]

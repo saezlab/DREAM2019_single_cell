@@ -3,7 +3,7 @@
 # A. Gabor
 
 library(tidyverse)
-# SC2
+# SC3
 
 
 # load data
@@ -40,12 +40,15 @@ gs_stats <- gs %>% filter(time==0) %>%
     select(-fileID,-cellID) %>%
     group_by(time_course) %>% nest() %>%
     mutate(stats = map(data,data_to_stats)) %>%
+    select(-data) %>%
     unnest(stats)	
 
 
 # we have time values for both timecourses: 
 tmp = gs_stats %>% spread(time_course,stat_value) 
 tmp[which(is.na(tmp$A)),]
+# there is no data on A for cell-line BT474
+gs_stats <- gs_stats %>% filter(cell_line !="BT474")
 # we just merge the time_course A and timecourse B statsitcs with the participants. 
 # note that many conditions disappear from the combined_statistics (left_join!),
 # where there is not both A B available
@@ -57,7 +60,7 @@ mixed_stats <- gs_stats %>% spread(time_course,stat_value) %>%
 
 
 # comparison to standard: 
-selected_predictions <- names(mixed_stats)[c(5:7,10:23)]
+selected_predictions <- names(mixed_stats)[c(5:6,10:23)]
 condition_stats_SumSquared <- mixed_stats %>% mutate(cond_id= paste(cell_line,treatment,time,sep = "_")) %>%
     group_by(cond_id) %>% 
     summarise_at(selected_predictions,~ sum((standard - .)^2,na.rm = TRUE))
@@ -67,7 +70,7 @@ condition_stats_SumSquared <- mixed_stats %>% mutate(cond_id= paste(cell_line,tr
 # show with barplot
 
 
-condition_stats_SumSquared %>% select(-standard_test) %>% 
+condition_stats_SumSquared %>% 
     summarise_at(2:17,~ sqrt(sum(.))) %>%
     gather(team,score) %>%
     mutate(team = gsub("X.","",team,fixed = T)) %>%
@@ -87,7 +90,7 @@ ggsave(filename = "./publication/figures/figure4/score_team_vs_bio_replicas.pdf"
 hide_names <- tibble(submitterId = ranked_teams, alt_name = paste0("#",as.character(1:length(ranked_teams))))
 
 
-condition_stats_SumSquared %>% select(-standard_test) %>% 
+condition_stats_SumSquared %>% 
     summarise_at(2:17,~ sqrt(sum(.))) %>%
     gather(submitterId,score) %>%
     left_join(hide_names, by="submitterId") %>%
@@ -102,6 +105,45 @@ condition_stats_SumSquared %>% select(-standard_test) %>%
     theme(panel.grid = element_blank())
 
 ggsave(filename = "./publication/figures/figure4/score_team_vs_bio_replicas_anonym.pdf",width = 3,height = 4)
+
+
+## Bootstrap samples: 
+
+N_bootstrap = 1000
+
+bootstrap_stats <- tibble(BS_sample = seq(N_bootstrap)) %>%
+    mutate( BS_score = map(BS_sample, .f = ~ condition_stats_SumSquared %>% 
+                               sample_frac(size = 1, replace = TRUE) %>%
+                               summarise_at(2:17,~ sqrt(sum(.))))
+    ) %>% unnest(BS_score)
+
+hide_names_bio = hide_names %>%
+    add_row(submitterId = "A",alt_name = "A",.before = 1)%>%
+    add_row(submitterId = "B",alt_name = "B",.after = 1)
+
+bootstrap_stats %>% gather(source,score,-BS_sample)%>%
+    
+    rename(submitterId ="source")%>%
+    left_join(hide_names_bio, by="submitterId") %>%
+    mutate(alt_name = factor(alt_name,levels = hide_names_bio$alt_name)) %>%
+    ggplot() + geom_boxplot(aes(alt_name,score))  +
+    xlab("Teams") + 
+    ylab("Bootstrap Score (Median, Cov)") + 
+    theme_bw()+ 
+    theme(axis.text.x = element_text(hjust=1,angle = 45)
+          #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          #axis.ticks = element_blank(),
+          #panel.border = element_blank(),
+          #legend.position = "none"
+    ) 
+
+
+if(FALSE) write_rds(bootstrap_stats,"./submission_analysis/intermediate_data/sc3_bootstrap_stats_bioreplica.rds")
+
+
+
+
+
 
 
 

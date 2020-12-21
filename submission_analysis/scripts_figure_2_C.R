@@ -66,6 +66,20 @@ ggsave("./publication/figures/figure2/conditional_prediction_accuracy_QCV_predic
 
 
 
+rmse_summary_data %>% full_join(div_summary_data, by = c("cell_line", "treatment", "marker"))  %>% 
+    ggplot(aes(marker,treatment)) +
+    geom_point(aes(size=med_rmse, fill = IQR_pred),na.rm = T,shape=21) +
+    theme_bw() +
+    theme(axis.text.x = element_text(hjust=0,angle = 90)) +
+    xlab("") + ylab("") + 
+    scale_fill_gradientn(colors = custom_colors(100)) +
+    scale_size_area(max_size = 5)+
+    facet_grid(~cell_line) +
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+    coord_equal()
+
+
+
 
 
 rmse_summary_data %>% full_join(div_summary_data, by = c("cell_line", "treatment", "marker")) %>%

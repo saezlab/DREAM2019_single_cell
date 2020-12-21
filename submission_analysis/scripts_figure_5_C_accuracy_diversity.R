@@ -1,6 +1,6 @@
 # find what is the most difficult to predict, like in SC1
-
-
+library(tidyverse)
+library(ggplot2)
 
 rmse_data <- read_rds("./submission_analysis/intermediate_data/sc4_rmse_conditions.rds")
 median_data <- read_rds("./submission_analysis/intermediate_data/sc4_combined_data.rds")
@@ -50,18 +50,47 @@ ggsave("./publication/figures/figure5/conditional_prediction_accuracy_QCV_predic
 
 # summarise RMSE by marker and treatment
 
+fill_color <- RColorBrewer::brewer.pal(8,"Dark2")[[1]]
+
+ordered_markers = rmse_markerwise_plot <- rmse_summary_data %>% group_by(marker) %>%
+    summarise(rmse = mean(med_rmse)) %>% arrange(desc(rmse)) %>%
+    mutate(marker = factor(marker,levels = marker)) %>% pull(marker)
+
 rmse_markerwise_plot <- rmse_summary_data %>% group_by(marker) %>%
-    summarise(rmse = mean(med_rmse)) %>% 
-    ggplot() + geom_col(aes(marker,rmse)) + theme_bw()
+    summarise(rmse = mean(med_rmse)) %>% arrange(desc(rmse)) %>%
+    mutate(marker = factor(marker,levels = marker)) %>%
+    ggplot() + geom_col(aes(marker,rmse)) + 
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90))
+
+rmse_markerwise_plot_violin <- rmse_summary_data %>% 
+    mutate(marker = factor(marker,levels = ordered_markers)) %>%
+    ggplot() +
+    geom_violin(aes(marker,med_rmse),draw_quantiles = 0.5,fill=fill_color) +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90,hjust = 1)) +ylab("median RMSE")
+
+
+ggsave("./publication/figures/figure5/rmse_by_markers.pdf",height = 3,width = 5,plot = rmse_markerwise_plot_violin)
 
 rmse_cellline_plot <- rmse_summary_data %>% group_by(cell_line) %>%
     summarise(rmse = mean(med_rmse)) %>% 
     ggplot() + geom_col(aes(cell_line,rmse)) + theme_bw()
 
+rmse_summary_data %>% 
+    ggplot() + geom_violin(aes(cell_line,med_rmse)) + theme_bw()
+
+
 rmse_treatment_plot <- rmse_summary_data %>% group_by(cell_line,treatment) %>%
     summarise(rmse = mean(med_rmse)) %>% 
     ggplot() + geom_col(aes(treatment,rmse)) + theme_bw() +facet_grid(~cell_line)
 
+rmse_summary_data %>% 
+    ggplot() + geom_violin(aes(treatment,med_rmse)) + theme_bw() +facet_grid(~cell_line)
+
 
 rmse_aov <- aov(med_rmse~marker+treatment+cell_line,data = rmse_summary_data)
 summary(rmse_aov)
+
+
+

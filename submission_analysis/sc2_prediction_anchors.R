@@ -1,9 +1,12 @@
+#1. we compare the stats computed on timecourse A and time course B to 
+# the the participants statistics.  
+# 2. compute the score of submitting the EGF instead of iInhib+EGF
+
+
 
 library(tidyverse)
 # SC2
 
-
-# we compare the stats computed on timecourse A and time course B to the the participants statistics. 
 
 # load data
 submission_folder = "./submission_data/final_round/SC2/"
@@ -46,7 +49,8 @@ gs_stats <- gs %>% filter(time==0) %>%
 gs_stats %>% spread(time_course,stat_value) 
 
 # we just merge the time_course A and timecourse B statsitcs with the participants. 
-# note that many conditions disappear from the combined_statistics, where there is not both A B available
+# note that many conditions disappear from the combined_statistics (left_join!),
+# where there is not both A B available
 mixed_stats <- gs_stats %>% spread(time_course,stat_value) %>% 
 	left_join(gs_stats_original,by = c("cell_line", "treatment", "time", "stat_variable")) %>%
 	left_join(combined_statistics, by = c("cell_line", "treatment", "time", "stat_variable"))
@@ -96,4 +100,90 @@ med_cov_stats %>% select(-standard_test) %>%
 	coord_equal(xlim = c(9,3000),ylim = c(9,3000)) +
 	theme_bw() + xlab("score based on covariance") +ylab("score based on mean")
 
-	
+
+# show with barplot
+
+
+condition_stats_SumSquared %>% select(-standard_test) %>% 
+    summarise_at(2:19,~ sqrt(sum(.))) %>%
+    gather(team,score) %>%
+    mutate(team = gsub("X.","",team,fixed = T)) %>%
+    mutate(source = ifelse(team %in% c("A","B"),"Biological replicas","Team predictions")) %>%
+    ggplot() + 
+    geom_point(aes(source,score)) + coord_cartesian(ylim = c(0,70))+
+    ggrepel::geom_text_repel(aes(source,score,label=team)) +
+    scale_y_continuous(expand = c(0, 0)) + 
+    xlab("") + ylab("Score (Mean, Cov)")
+
+ggsave(filename = "./publication/figures/figure3/score_team_vs_bio_replicas.pdf",width = 3,height = 4)
+
+
+hide_names <- tibble(submitterId = ranked_teams, alt_name = paste0("#",as.character(1:length(ranked_teams))))
+
+
+
+condition_stats_SumSquared %>% select(-standard_test) %>% 
+    summarise_at(2:19,~ sqrt(sum(.))) %>%
+    gather(submitterId,score) %>%
+    left_join(hide_names, by="submitterId") %>%
+    mutate(alt_name = ifelse(submitterId %in% c("A","B"),submitterId,alt_name)) %>%
+    mutate(source = ifelse(submitterId %in% c("A","B"),"Biological replicas","Team predictions")) %>%
+    ggplot() + 
+    geom_point(aes(source,score)) + coord_cartesian(ylim = c(0,70))+
+    ggrepel::geom_text_repel(aes(source,score,label=alt_name)) +
+    scale_y_continuous(expand = c(0, 0)) + 
+    xlab("") + ylab("Score (Mean, Cov)")
+
+ggsave(filename = "./publication/figures/figure3/score_team_vs_bio_replicas_anonym.pdf",width = 3,height = 4)
+
+
+
+
+condition_stats_SumSquared %>% summarise_at(selected_predictions,~ sqrt(sum((.)^2)))
+
+
+### Idea 2. --------------------------------------------------------------------
+# from Atta participant: what about using EGF as an estimate for the other kinase inhibition
+
+
+library(tidyverse)
+# SC2
+
+combined_statistics <- read_rds("./submission_analysis/intermediate_data/sc2_stats_conditions.rds")
+source("./scoring_scripts/score_sc2.R")
+# load the single cell data
+EGF_data <- list.files("./challenge_data/single_cell_phospho/subchallenge_2/", full.names = T) %>%
+    lapply(., function(sc_file){
+        sc_data <- read_csv(sc_file)
+        sc_data %>% filter(treatment=="EGF")
+    }) %>% bind_rows()
+
+EGF_stats <- EGF_data %>%
+    select(-cellID,-fileID) %>% 
+    data_to_stats()	
+    
+EGF_stats <- EGF_stats %>% 
+    rename("pred_treatment"="treatment") %>%
+    rename("EGF_stat"="stat_value")
+
+
+# we have to fix the timing:
+# - EGF and inhibitors have different times
+# - luckily only {53 MDAMB231  iPI3K      16   NA } is missing from the EGF, 
+# because it is {107 MDAMB231  NA         17   EGF}
+# run this to check:  
+# full_join(combined_statistics %>% select(cell_line,treatment,time) %>% unique(),
+# EGF_stats %>% select(cell_line,pred_treatment,time) %>% unique()) %>% print(n=121)
+#
+# to fix, we overwrite the EGF 17 to EGF 16. (that is the clsest timepoint)
+EGF_stats <- EGF_stats %>% mutate(time = ifelse(cell_line == "MDAMB231" & time==17, 16, time))
+
+selected_predictions <- names(combined_statistics)[c(7:22)]
+
+all_stats <- left_join(combined_statistics, EGF_stats, by = c("cell_line", "time", "stat_variable")) %>%
+    select(1:5, EGF_stat, everything()) %>%
+    summarise_at(c("EGF_stat",selected_predictions),~ sqrt(sum((standard - .)^2)))
+# %>%
+#     filter(is.na(EGF_stat)) %>% select(cell_line, treatment, time) %>% unique()
+
+all_stats$EGF_stat

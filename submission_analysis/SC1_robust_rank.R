@@ -37,10 +37,19 @@ SC_leaderboard = read_csv(
 SC_leaderboard <- SC_leaderboard %>% filter(submitterId != "KAUST_RSS") 
 
 # we take a subset of teams from the top of the rankings. 
-N_top <- 22
+N_top <- nrow(SC_leaderboard)
 
 ranked_teams <- factor(SC_leaderboard$submitterId[1:N_top],
 					   levels = SC_leaderboard$submitterId[1:N_top])
+
+# submission statistics
+SC_leaderboard %>% summarise(mean = mean(score),
+                             std = sd(score),
+                             median = median(score),
+                             range_L = range(score)[[1]],
+                             range_U = range(score)[[2]])
+                            
+
 
 SC_leaderboard %>%  
 	ggplot(aes(factor(submitterId,levels = SC_leaderboard$submitterId),score)) +
@@ -125,7 +134,14 @@ if(FALSE){
 	write_rds(ranked_teams, "./submission_analysis/intermediate_data/sc1_ranked_teams.rds")
 }
 
+bootstrap_RMSE <- read_rds("./submission_analysis/intermediate_data/sc1_bootstrap_rmse.rds")
+ranked_teams <- read_rds("./submission_analysis/intermediate_data/sc1_ranked_teams.rds")
 
+
+bootstrap_RMSE %>% 
+    gather(teams,RMSE,-BS_sample) %>% group_by(teams) %>%
+    summarise(mean_RMSE_BS = mean(RMSE),
+              std_RMSE_BS = sd(RMSE))
 
 # Plot the performance of the team on the bootstrap samples
 bootstrap_RMSE %>% 
