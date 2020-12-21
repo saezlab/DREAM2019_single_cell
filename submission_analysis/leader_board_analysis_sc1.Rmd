@@ -25,19 +25,19 @@ Here we report some statistics about subchallenge I and evaluate the leaderboard
 
 ```{r message=FALSE, warning=FALSE, paged.print=FALSE, results=FALSE, echo=FALSE}
 
-LB_sc1 <- read_csv("../submission_data/final_round/leaderboard_all_rounds_sc1.csv") %>%
+LB_sc1 <- read_csv("../submission_data/final_round/outdated/leaderboard_all_rounds_sc1.csv") %>%
 	fix_leaderboard_raw() %>% filter(!is.na(round)) %>%
 	mutate(createdOn = fix_submission_dates(createdOn)) %>%
 	mutate(round = paste0("round_",round))
-LB_sc2 <- read_csv("../submission_data/final_round/leaderboard_all_rounds_sc2.csv") %>%
+LB_sc2 <- read_csv("../submission_data/final_round/outdated/leaderboard_all_rounds_sc2.csv") %>%
 	fix_leaderboard_raw() %>%  filter(!is.na(round)) %>%
 	mutate(createdOn = fix_submission_dates(createdOn)) %>%
 	mutate(round = paste0("round_",round))
-LB_sc3 <- read_csv("../submission_data/final_round/leaderboard_all_rounds_sc3.csv") %>%
+LB_sc3 <- read_csv("../submission_data/final_round/outdated/leaderboard_all_rounds_sc3.csv") %>%
 	fix_leaderboard_raw() %>%  filter(!is.na(round)) %>%
 	mutate(createdOn = fix_submission_dates(createdOn)) %>%
 	mutate(round = paste0("round_",round))
-LB_sc4 <- read_csv("../submission_data/final_round/leaderboard_all_rounds_sc4.csv") %>%
+LB_sc4 <- read_csv("../submission_data/final_round/outdated/leaderboard_all_rounds_sc4.csv") %>%
 	fix_leaderboard_raw() %>%  filter(!is.na(round)) %>%
 	mutate(createdOn = fix_submission_dates(createdOn)) %>%
 	mutate(round = paste0("round_",round))

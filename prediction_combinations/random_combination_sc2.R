@@ -14,7 +14,7 @@ setwd("~/Desktop/BQ internship/DREAM2019_single_cell")
 source("./scoring_scripts/score_sc2_noFile.R")
 
 validation_data <- read_csv("./challenge_data/validation_data/sc2gold.csv") %>% select(required_columns)
-leader_board <- read_csv("./submission_data/final/SC2/leaderboard_final_sc2.csv")
+leader_board <- read_csv("./submission_data/final_round/SC2/leaderboard_final_sc2.csv")
 
 # The predicted cells of the teams, nested so team-cell_line-Tr-Time-dataframe with predictions 
 nested_predictions <- readRDS("./submission_data/intermediate_data/sc2_all_predictions_nested.rds") %>%
@@ -36,13 +36,28 @@ for (n in 2:dim(leader_board)[1]) {
     # Select the sampled predictions
     predictions <- sample(unique(nested_predictions$team), n_samples, replace = FALSE)
     
-    # Combine by sampling equally from the selected submissions and score it
+    # Combine by sampling equally from the selected submissions
     equal_sample_size <- nested_predictions %>%
       filter(team %in% predictions) %>%
-      mutate(sample = map(data, ~sample_frac(., 1/n_samples))) %>%
-      select(-c(data, team)) %>%
-      unnest(sample) %>%
-      select(required_columns) %>%
+      mutate(sample = map(data, ~sample_frac(., 1/n_samples))) 
+    # 
+    # # show the paradoxon: 
+    # equal_sample_size %>%
+    #     select(-data) %>%
+    #     unnest(sample) %>%
+    #     filter(cell_line == "HCC202", time == 0) %>%
+    #     ggplot(aes(IdU,p.RB)) + 
+    #     geom_point(aes(IdU,p.RB,col=team),size=0.5,alpha= 0.1) +
+    #     geom_smooth(method = "lm", aes(col="global"), color="black") +
+    #     geom_smooth(aes(col=team), method = "lm")+ theme_bw()
+        
+    # and score it
+    equal_sample_size <- equal_sample_size %>%
+        #select(-c(data, team)) %>%
+        select(-c(data, team)) %>%
+        unnest(sample) %>%
+        select(required_columns)
+    
       score_sc2(validation_data)
     
     # Update all scores

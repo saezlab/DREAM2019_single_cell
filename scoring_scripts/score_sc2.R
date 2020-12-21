@@ -12,10 +12,11 @@ library(tibble)
 # this function computes the mean and covariance matrices from the single cell data
 # returns the matrices in long format
 data_to_stats <- function(single_cell_data){
+    
 	# first we compute the mean and the covariance of the reporters
 	single_cell_stats <-  single_cell_data %>% 
 		group_by(cell_line,treatment,time) %>%
-		nest(.key = "data") %>%
+		nest() %>%
 		mutate(mean_values = map(data,colMeans)) %>%
 		mutate(cov_values = map(data,cov))
 	
@@ -40,7 +41,7 @@ data_to_stats <- function(single_cell_data){
 		mutate(vec_cov = map(cov_values,flattenCovMatrix)) %>% 
 		mutate(all_stats = map2(vec_mean,vec_cov,function(mean,cov){
 			rbind(mean,cov)
-		})) %>% unnest(all_stats)
+		})) %>% select(cell_line, treatment, time,all_stats) %>% unnest(all_stats)
 	
 	
 	return(single_cell_stats_long)

@@ -7,13 +7,13 @@ library(tidyr)
 library(tibble)
 library(Biobase)
 
-setwd("~/Desktop/BQ internship/DREAM2019_single_cell")
-
-leader_board <- read_csv("./submission_data/final/SC3/leaderboard_final_sc3.csv")
-submissions <-  readRDS("./submission_data/intermediate_data/sc3_ranked_teams.rds") %>%
+#setwd("~/Desktop/BQ internship/DREAM2019_single_cell")
+# 
+# leader_board <- read_csv("./submission_data/final/SC3/leaderboard_final_sc3.csv")
+submissions <-  readRDS("./submission_analysis/intermediate_data/sc3_ranked_teams.rds") %>%
   as.character()
 # Statistics per condition of the standard and calculated from the predictions, including median EGF t=0 values per condition
-sub_data_values <- readRDS("./submission_data/intermediate_data/sc3_values_median_EGF0.rds") %>%
+sub_data_values <- readRDS("./submission_analysis/intermediate_data/sc3_stats_conditions.rds") %>%
   select(cell_line, treatment, time, stat_variable, standard, submissions)
 
 # Radnomly sample 1 submission by sampling scores from the leaderboard

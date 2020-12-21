@@ -22,7 +22,7 @@ colors  = brewer.pal(n = 8,"Dark2")
 Here we report some statistics about subchallenge IV and evaluate the leaderboard. 
 
 ```{r message=FALSE, warning=FALSE, paged.print=FALSE, results=FALSE, echo=FALSE}
-LB <- read_csv("../submission_data/final_round/leaderboard_all_rounds_sc4.csv") %>%
+LB <- read_csv("../submission_data/final_round/outdated/leaderboard_all_rounds_sc4.csv") %>%
 	fix_leaderboard_raw() %>%  filter(!is.na(round)) %>%
 	mutate(createdOn = fix_submission_dates(createdOn)) %>%
 	mutate(round = paste0("round_",round))

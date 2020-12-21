@@ -89,7 +89,7 @@ saveRDS(RMSE_conditions, "./submission_data/intermediate_data/sc1_rmse_condition
 source("./scoring_scripts/score_sc2_noFile.R")
 # make sure to download the data of each team to this folder: 
 # naming convention for files: `submissionID`.csv
-submission_folder = "./submission_data/final/SC2/"
+submission_folder = "./submission_data/final_round/SC2/"
 
 # read leaderboard
 SC_leaderboard = read_csv(file.path(submission_folder,"leaderboard_final_sc2.csv")) %>%
@@ -99,7 +99,7 @@ SC_leaderboard = read_csv(file.path(submission_folder,"leaderboard_final_sc2.csv
 
 # get the team names ranked by performance
 ranked_teams <- factor(SC_leaderboard$submitterId,levels = SC_leaderboard$submitterId)
-saveRDS(ranked_teams, "./submission_data/intermediate_data/sc2_ranked_teams.rds")
+#saveRDS(ranked_teams, "./submission_data/intermediate_data/sc2_ranked_teams.rds")
 
 # read team's predictions from csv files and compute the stats
 required_columns <- c('cell_line','treatment', 'time',
@@ -175,7 +175,7 @@ nested_predictions <- bind_rows(all_predictions, .id = "team") %>%
   arrange(team, cell_line, treatment, time) %>%
   nest() %>%
   ungroup() 
-saveRDS(nested_predictions, "./submission_data/intermediate_data/sc2_all_predictions_nested.rds")
+write_rds(nested_predictions, "./submission_analysis/intermediate_data/sc2_all_predictions_nested.rds")
 
 
 # SC3 --------------------------------------------------------------------------

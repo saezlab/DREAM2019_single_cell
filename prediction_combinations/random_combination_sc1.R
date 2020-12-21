@@ -9,10 +9,11 @@ setwd("~/Desktop/BQ internship/DREAM2019_single_cell")
 
 # The predictions of each team are a column, one column per team
 # Thecolumn standard is the goldesn standard/true value
-all_predictions <- readRDS("./submission_data/intermediate_data/sc1_all_predictions.rds")
+all_predictions <- readRDS("./submission_analysis/intermediate_data/sc1_all_NP_predictions.rds")
+all_predictions = all_predictions %>% select(-31:-62)
 
-leader_board <- read_csv("./submission_data/final/SC1/leaderboard_final_sc1.csv")
-submissions <- readRDS("./submission_data/intermediate_data/sc1_ranked_teams.rds") %>% as.character()
+leader_board <- read_csv("./submission_data/final_round/SC1/leaderboard_final_sc1.csv")
+submissions <- readRDS("./submission_analysis/intermediate_data/sc1_ranked_teams.rds") %>% as.character()
 
 # Radnomly sample 1 submission by sampling scores from the leaderboard
 repeated_scores <- tibble("Sample_size" = rep(1, 100), "Iteration" = seq(1,100), 
@@ -24,6 +25,7 @@ for (n in 2:length(submissions)) {
   
   n_samples <- n
   n_iter<- 100
+  combinations = list()
   
   for (j in 1:n_iter) {
     print(paste0("samples: :", n_samples, " iteration: ", j))
@@ -32,12 +34,15 @@ for (n in 2:length(submissions)) {
     selected_submissions <- sample(submissions, n_samples)
 
     # Combine the selected submissions by taking the median and score it
-    median_score <-  all_predictions %>% 
+    combined_rmse_per_condition <-  all_predictions %>% 
       mutate(prediction = rowMedians(as.matrix(.[selected_submissions]))) %>%
       group_by(cell_line, treatment, time, marker) %>%
-      summarise(RMSE = sqrt(sum((standard - prediction)^2) / n())) %>%
-      pull(RMSE) %>%
-      mean()
+      summarise(RMSE = sqrt(sum((standard - prediction)^2) / n())) 
+    
+    
+    combinations[[j]] = combined_rmse_per_condition %>% mutate(iter = j)
+    median_score = combined_rmse_per_condition %>% pull(RMSE) %>%
+        mean()
     
     repeated_scores <- repeated_scores %>% add_row("Sample_size" = n_samples, 
                                                    "Iteration" = j, 
