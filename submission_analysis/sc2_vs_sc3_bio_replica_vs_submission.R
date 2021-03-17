@@ -65,18 +65,27 @@ bind_rows(sc2_stats_long %>% mutate(scaled_score = score/sqrt(12)),
     ) 
 
 
+
+team_ranks <- team_ranks %>% mutate(alt_name = as.character(1:n())) %>% 
+    add_row(team = "A",N_challenge=2,mean_rank = 0,alt_name="replica A") %>%
+    add_row(team = "B",N_challenge=2,mean_rank = 0.5,alt_name="replica B") %>% 
+    arrange(mean_rank) %>%
+    mutate(alt_name = factor(alt_name,levels = alt_name))
+
 # how does it look if we compensate for the different number of conditions (Cell_line and stats)
 # SC2: 12 cell_line * 665 (medians and covariance pairs) = 7980
 # SC3: 38 * 665 = 25270
 bind_rows(sc2_stats_long %>% mutate(scaled_score = score/sqrt(7980)),
           sc3_stats_long %>%mutate(scaled_score = score/sqrt(25270))) %>%
-    mutate(id = factor(id,levels = (c("A","B",team_ranks$team)))) %>%
+    left_join(team_ranks,by=c("id"="team")) %>%
+    rename(Subchallenge = "sc") %>%
+    mutate(Subchallenge = factor(paste0("SC ",Subchallenge))) %>%
     ggplot() + 
-    geom_boxplot(aes(id,scaled_score,fill=factor(sc)),outlier.size = .5,size=0.1)  +
+    geom_boxplot(aes(alt_name,scaled_score,fill=Subchallenge),outlier.size = .5,size=0.1)  +
     xlab("Teams") + 
     ylab("Error per estimated statistics") + 
     theme_bw()+ 
-    theme(axis.text.x = element_text(hjust=1,angle = 45)
+    theme(axis.text.x = element_text(hjust=1,angle = 45),legend.position = c(0.2,0.8)
     ) 
 
 ggsave("./publication/figures/sc2_sc3_error_per_stats.pdf",width = 6,height = 4)

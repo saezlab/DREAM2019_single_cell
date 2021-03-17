@@ -138,6 +138,13 @@ if(FALSE){
 	write_rds(combined_statistics,"./submission_analysis/intermediate_data/sc2_stats_conditions.rds")
 	write_rds(bootstrap_stats,"./submission_analysis/intermediate_data/sc2_bootstrap_stats.rds")
 	write_rds(ranked_teams, "./submission_analysis/intermediate_data/sc2_ranked_teams.rds")
+}else{
+    
+    condition_stats_SumSquared <- read_rds("./submission_analysis/intermediate_data/sc2_stats_sumSquared_conditions.rds")
+    combined_statistics <- read_rds("./submission_analysis/intermediate_data/sc2_stats_conditions.rds")
+    bootstrap_stats <- read_rds("./submission_analysis/intermediate_data/sc2_bootstrap_stats.rds")
+    ranked_teams <- read_rds("./submission_analysis/intermediate_data/sc2_ranked_teams.rds")
+    
 }
 
 

@@ -41,7 +41,7 @@ read_sample <- function(file_name){
 }
 
 prediction_data <- SC_leaderboard  %>%
-    top_n(-1,score) %>% # select top 4 teams
+    top_n(-4,score) %>% # select top 4 teams
     mutate(predictions = map(file.path(submission_folder,submissions),read_sample))
 
 

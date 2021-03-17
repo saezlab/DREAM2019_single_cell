@@ -224,7 +224,7 @@ rmse_plot <- RMSE_all %>% ungroup() %>% select(cell_line, marker, team,RMSE) %>%
     geom_point(aes(alpha = data)) + 
     geom_line(aes(group = team,alpha = data)) +
     theme_bw()+ 
-    theme(axis.text.x = element_blank()) + 
+    theme(axis.text.x = element_blank(),legend.position = c(0.8,0.7),legend.title = element_blank()) + 
     scale_alpha_manual(values = c(`top 3 teams`=0.5,`average cell line`=1,`other teams`=0.15)) +
     xlab("")+ylab("average RMSE")
 
@@ -240,7 +240,7 @@ sd_time_plot <- marker_variance_time %>%
 
 cowplot::plot_grid(rmse_plot,sd_cell_line_plot,sd_time_plot, axis = "lr", align = "v", rel_heights =  c(0.5,0.3,0.5), ncol = 1)
 
-ggsave("./publication/figures/figure5/RMSE_comparison_ave_cellline.pdf",width = 8,height = 6)
+ggsave("./publication/figures/figure5/RMSE_comparison_ave_cellline.pdf",width = 6,height = 6)
 
 
 

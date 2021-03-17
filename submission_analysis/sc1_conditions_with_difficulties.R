@@ -28,8 +28,6 @@ rmse_data %>% select(-X.Huiyuan,-SCG) %>%
                        cluster_rows = FALSE)
 
 
-
-
 # supp material 2:
 # barplot that shows how many conditions were won by each team. 
 #select(-rmse) %>% 
@@ -51,10 +49,11 @@ rmse_data %>%
 
 ggsave("./publication/figures/supp_figures/sc1_winners_by_conditions_bar.pdf",width = 5,height = 4.7)	
 
-
+# how many conditions won per team:
 rmse_data %>% gather(team, rmse,-1:-4) %>% group_by(cell_line, treatment, time, marker) %>%
     top_n(-1,wt = rmse) %>%
     ungroup() %>% pull(team) %>% table() %>% sort()
+
 
 #################
 # what is the most difficult part to predict? 
@@ -123,11 +122,9 @@ rmse_data %>% gather(team, rmse,-1:-4) %>%
 ggsave("./publication/figures/figure2/conditional_prediction_accuracy.pdf",width = 8.3,height = 7.4)
 
 #scale_color_gradientn(colors = custom_colors(100))
-scale()
+
 
 # use corrplot
-
-
 col1 <- colorRampPalette(c("#7F0000", "red", "#FF7F00", "yellow", "white",
                            "cyan", "#007FFF", "blue","#00007F"))
 
@@ -191,7 +188,6 @@ p1 <- rmse_data %>% select(cell_line, treatment,  time, marker, icx_bxai) %>%
     column_to_rownames("y_id") %>% 
     pheatmap::pheatmap(mat = .,cluster_cols = F,cluster_rows = F,
                        main = "RMSE of icx_bxai model",
-                       gaps_col = c(6,12,18,24,30), 
                        gaps_row = c(12,13,22,31,40), 
                        breaks = seq(0.4,2,length.out = 50),
                        color = colorRampPalette(rev(RColorBrewer::brewer.pal(n = 7, name ="RdYlBu")))(49))
@@ -278,7 +274,111 @@ cowplot::plot_grid(plot_rmse_cell_line,plot_rmse_marker,plot_rmse_time, plot_rms
 
 ggsave("./publication/figures/supp_figures/sc1_prediction_error_per_condition.pdf",width = 8,height = 6)
 
-# HCC2218 and p.S6 was the most difficult to predict in SC1
+
+### add stats for comparison
+library(ggpubr)
+stat_plot_treatment <- team_independent_predictions %>% ggviolin(x="treatment",y="RMSE",draw_quantiles = 0.5,fill= fill_color)+
+    stat_compare_means(method = "anova",label.y = 2.2,label.x = 1) + 
+    geom_hline(yintercept = median(team_independent_predictions$RMSE), linetype = 2, color="red",size=1)+
+    stat_compare_means(label = "p.signif",method = "t.test",ref.group = ".all.", label.y = 2)+
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 60,hjust = 1))+
+    ggtitle("Treatment") +
+    xlab("") + 
+    coord_cartesian(ylim = c(0,2.5))
+
+
+stat_plot_cl <- team_independent_predictions %>% ggviolin(x="cell_line",y="RMSE",draw_quantiles = 0.5,fill= fill_color)+
+    stat_compare_means(method = "anova",label.y = 2.2,label.x = 1.5) + 
+    geom_hline(yintercept = median(team_independent_predictions$RMSE), linetype = 2, color="red",size=1)+
+    stat_compare_means(label = "p.signif",method = "t.test",ref.group = ".all.", label.y = 2)+
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 60,hjust = 1))+
+    ggtitle("Cell line") +
+    xlab("")+ 
+    coord_cartesian(ylim = c(0,2.5))
+
+stat_plot_marker <- team_independent_predictions %>% ggviolin(x="marker",y="RMSE",draw_quantiles = 0.5,fill= fill_color)+
+    stat_compare_means(method = "anova",label.y = 2.2) + 
+    geom_hline(yintercept = median(team_independent_predictions$RMSE), linetype = 2,color="red",size=1)+
+    stat_compare_means(label = "p.signif",method = "t.test",ref.group = ".all.", label.y = 2)+
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 60,hjust = 1)) + 
+    ggtitle("Marker") +
+    xlab("")+ 
+    coord_cartesian(ylim = c(0,2.5))
+
+stat_plot_time <- team_independent_predictions %>% ggviolin(x="time",y="RMSE",draw_quantiles = 0.5,fill= fill_color)+
+    stat_compare_means(method = "anova",label.y = 2.2,label.x = 2) + 
+    geom_hline(yintercept = median(team_independent_predictions$RMSE), linetype = 2,color="red",size=1)+
+    stat_compare_means(label = "p.signif",method = "t.test",ref.group = ".all.", label.y = 2)+
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 60,hjust = 1))+
+    ggtitle("Time points") +
+    xlab("")+ 
+    coord_cartesian(ylim = c(0,2.5))
+
+
+cowplot::plot_grid(stat_plot_cl,stat_plot_marker,stat_plot_treatment, stat_plot_time,nrow = 1,align = "h", axis = "b")
+
+ggsave("./publication/figures/figure2/RMSE_distribution.pdf",width = 12,height = 4)
+
+
+# T-test: marker group vs global
+
+team_independent_predictions %>% ungroup() %>%
+    select(marker,RMSE) %>%
+    group_nest(marker) %>%
+    mutate(t_test = map(data,function(x){
+        t.test(x = x$RMSE,y = team_independent_predictions$RMSE)
+        })) %>%
+    mutate(res = map(t_test,broom::tidy)) %>%
+    select(marker,res) %>% unnest(res) %>%
+    rename(groupMeanRMSE = "estimate1",
+           globalMeanRMSE = "estimate2",
+           deltaRMSE = "estimate") %>%
+    select(-method,-alternative)
+
+# T-test: cell line group vs global
+team_independent_predictions %>% ungroup() %>%
+    select(cell_line,RMSE) %>%
+    group_nest(cell_line) %>%
+    mutate(t_test = map(data,function(x){
+        t.test(x = x$RMSE,y = team_independent_predictions$RMSE)
+    })) %>%
+    mutate(res = map(t_test,broom::tidy)) %>%
+    select(cell_line,res) %>% unnest(res)%>%
+    rename(groupMeanRMSE = "estimate1",
+           globalMeanRMSE = "estimate2",
+           deltaRMSE = "estimate") %>%
+    select(-method,-alternative)
+
+
+team_independent_predictions %>% ungroup() %>%
+    select(time,RMSE) %>%
+    group_nest(time) %>%
+    mutate(t_test = map(data,function(x){
+        t.test(x = x$RMSE,y = team_independent_predictions$RMSE)
+    })) %>%
+    mutate(res = map(t_test,broom::tidy)) %>%
+    select(time,res) %>% unnest(res)%>%
+    rename(groupMeanRMSE = "estimate1",
+           globalMeanRMSE = "estimate2",
+           deltaRMSE = "estimate") %>%
+    select(-method,-alternative)
+
+team_independent_predictions %>% ungroup() %>%
+    select(treatment,RMSE) %>%
+    group_nest(treatment) %>%
+    mutate(t_test = map(data,function(x){
+        t.test(x = x$RMSE,y = team_independent_predictions$RMSE)
+    })) %>%
+    mutate(res = map(t_test,broom::tidy)) %>%
+    select(treatment,res) %>% unnest(res)%>%
+    rename(groupMeanRMSE = "estimate1",
+           globalMeanRMSE = "estimate2",
+           deltaRMSE = "estimate") %>%
+    select(-method,-alternative)
 
 
 
@@ -287,7 +387,7 @@ aov_res <- team_independent_predictions %>% ungroup() %>%
     mutate_at(c("cell_line","treatment","time","marker"),as.factor) %>%
     aov(data = ., RMSE ~ cell_line+treatment+time+marker ) %>% summary(.)
 
-gt_data <- as.data.frame(aov_res[[1]]) %>% mutate_each(~format(.,digits = 2))
+gt_data <- as.data.frame(aov_res[[1]]) %>% mutate(across(everything(),~format(.,digits = 2)))
 gt_table <- gridExtra::grid.table(gt_data)
 
 ggsave(filename = "./publication/figures/supp_figures/sc1_prediction_error_annova_table.pdf",
@@ -557,6 +657,27 @@ plt_data %>% ggplot() +
 
 
 ggsave("./publication/figures/figure2/sc1_mek_indep_ERK.pdf",width = 5,height = 2.5)
+
+plt_data %>% 
+    ggplot() +
+    geom_line(aes(x = time, y=prediction,group= paste(team,treatment), col = treatment,size="prediction"),alpha=0.6) +
+    geom_line(aes(x = time, y=standard,col=treatment,size="measured data")) +
+    geom_point(aes(x = time, y=standard, col = treatment)) +
+    facet_grid(~cell_line) + 
+    theme_bw() +
+    scale_size_manual(name = "",values = c(prediction=0.2,`measured data`=1))+
+    ylab("p-ERK intensity")+
+    xlab("time [mins]") +
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+    
+    
+
+
+ggsave("./publication/figures/figure2/sc1_mek_indep_ERK.pdf",width = 5,height = 2.5)
+
+
+
+
 
 ### iEGFR independent ERK signaling -- skipped
 # we compare 2 cell-lines ("AU565","HCC2218") 

@@ -196,10 +196,10 @@ rank_plot <- bootstrap_RMSE %>%
     mutate(teams = factor(teams,levels = levels(ranked_teams))) %>%
     left_join(hide_names,by="teams") %>% 
     select(-teams) %>%
-    
     ggplot() +
     geom_violin(aes(alt_name,RMSE,fill="team prediction"),draw_quantiles = 0.5) + 
     geom_hline(data = NULL,  aes(yintercept = 0.428, color = "average cell line"))+
+    geom_hline(data = NULL,  aes(yintercept = 0.3408274, color = "reference model"))+
     theme_bw() +
     theme(# axis.text.x = element_blank(),
         # axis.ticks.x = element_blank(),
@@ -213,7 +213,7 @@ rank_plot <- bootstrap_RMSE %>%
     xlab("Teams") + 
     ylab("Score (RMSE)") +
     scale_fill_manual(values = c("team prediction"= my_colors[[1]])) +
-
-    scale_color_manual(values = c("average cell line" = my_colors[[4]]))
+    scale_color_manual(values = c("average cell line" = my_colors[[4]],
+                                  "reference model"=my_colors[[3]]))
 print(rank_plot)
 ggsave("./publication/figures/figure5/sc4_leaderboard_anonym_rank_only_nocombination.pdf", width = 6,height = 3)

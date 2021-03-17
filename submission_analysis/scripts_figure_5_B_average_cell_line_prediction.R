@@ -188,6 +188,52 @@ ggsave("publication/figures/figure5/sc4_CAMA1_examples_wlegend_cond_ALL.pdf",plo
 
 ####
 
+
+# Compare EGF across all cell-lines: the average model is the same
+
+team_rank = tibble(teams = as.character(ranked_teams), position = 1:length(ranked_teams))
+
+
+gg_Data <-  median_predictions %>%
+    left_join(average_cell_line, by = c("treatment", "time", "marker")) %>%
+    gather(source,value,standard,icx_bxai,ave_cell_line,as.character(ranked_teams))  %>%
+    #filter(treatment=="EGF",cell_line=="CAL120") %>%
+    #filter(cell_line=="CAMA1") %>%
+    filter(treatment=="EGF") %>%
+    filter(marker %in% c("p.ERK","p.S6","p.Akt.Ser473.","p.p90RSK")) 
+
+gg_Data <- gg_Data %>% left_join(team_rank, by = c("source"="teams"))
+
+gg1 <- ggplot() +
+
+    geom_line(data = filter(gg_Data,!source %in% c("standard","average_cell_line",position>3)),
+              aes(time, value,group=source,col="other teams"),alpha=0.2) +
+    geom_line(data = filter(gg_Data,!source %in% c("standard","average_cell_line"),position<=3),
+              aes(time, value,group=source,col="top 3 teams")) +
+    
+    geom_point(data = filter(gg_Data,source=="standard"),aes(time, value, col="measurements")) +
+    geom_line(data = filter(gg_Data,source=="standard"),aes(time, value, col="measurements")) +
+    
+    geom_line(data = filter(gg_Data,source=="ave_cell_line"),aes(time, value, col="average cell line"),size=1) +
+    
+    facet_grid(cell_line+treatment~marker) +
+    theme_bw() +
+    scale_color_manual(values = c(`other teams` = RColorBrewer::brewer.pal(8,"Dark2")[1],
+                                  `top 3 teams` = RColorBrewer::brewer.pal(8,"Dark2")[3],
+                                  `average cell line` = RColorBrewer::brewer.pal(8,"Dark2")[[2]],
+                                  measurements = RColorBrewer::brewer.pal(8,"Dark2")[[8]]))  +
+    theme(panel.grid = element_blank(),
+          legend.title = element_blank()) +
+    xlab("time [min]") + ylab("signal internsity")
+# scale_color_brewer(palette = "Dark2")
+print(gg1)
+
+ggsave("publication/figures/figure5/sc4_EGF_examples_wlegend_All_cell_lines.pdf",plot = gg1, height = 6,width = 6)
+
+
+
+
+
 # compare the RMSE for the top 3 teams and average cell-line
 
 RMSE_all <- median_predictions %>% left_join(average_cell_line, by = c("treatment", "time", "marker")) %>%
@@ -207,7 +253,41 @@ RMSE_all %>% ggplot() +
     geom_boxplot(aes(cell_line,RMSE,group=paste(cell_line,source),fill=source),draw_quantiles = 0.5) +
     theme_bw() + theme(axis.text.x = element_text(angle = 45,hjust = 1)) + labs(fill = "")
 
-ggsave("publication/figures/figure5/sc4_prediction_vs_averageCL_celllines.pdf", height = 3,width = 5)
+prediction_rmse <- RMSE_all %>% filter(source !="average") 
+fill_color <- RColorBrewer::brewer.pal(8,"Dark2")[[1]]
+
+prediction_rmse %>% ggviolin(x="cell_line",y="RMSE",draw_quantiles = 0.5,fill= fill_color)+
+    stat_compare_means(method = "anova",label.y = 1.8,label.x = 1) + 
+    geom_hline(yintercept = median(prediction_rmse$RMSE), linetype = 2,color="red",size=1)+
+    stat_compare_means(label = "p.signif",method = "t.test",ref.group = ".all.", label.y = 1.6)+
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 60,hjust = 1))+
+    ggtitle("Cell line") +
+    xlab("")+ ylab("RMSE") + 
+    coord_cartesian(ylim = c(0,1.9))
+
+
+
+ggsave("publication/figures/figure5/sc4_RMSE_distributon_cell_lines.pdf", height = 3,width = 5)
+
+
+# test cell line vs global 
+prediction_rmse %>% ungroup() %>%
+    select(cell_line,RMSE) %>%
+    group_nest(cell_line) %>%
+    mutate(t_test = map(data,function(x){
+        t.test(x = x$RMSE,y = prediction_rmse$RMSE)
+    })) %>%
+    mutate(res = map(t_test,broom::tidy)) %>%
+    select(cell_line,res) %>% unnest(res)%>%
+    rename(groupMeanRMSE = "estimate1",
+           globalMeanRMSE = "estimate2",
+           deltaRMSE = "estimate") %>%
+    mutate(relRMSE = deltaRMSE/globalMeanRMSE) %>%
+    select(-method,-alternative)
+
+
+
 
 ### 
 # (2) based on markers

@@ -42,6 +42,7 @@ robust_score <- bootstrap_RMSE %>%
                                   score_max = max(RMSE),
                                   score_med = median(RMSE))
 
+#robust_score <- robust_score %>% filter(score_med<1.3)
 
 method_res <- method_usage %>% select(-5,-11,-12, -13) %>%
     mutate(teams = factor(submitterId,levels = levels(ranked_teams))) %>%
@@ -49,11 +50,18 @@ method_res <- method_usage %>% select(-5,-11,-12, -13) %>%
     gather(method_info,method_value,-teams) %>%
     mutate(method_info = factor(method_info,levels = rev(descriptor_order))) 
 
+# annotate = robust_score %>% select(teams,score_med) %>% column_to_rownames("teams")
+# method_res %>% filter(teams %in%robust_score$teams ) %>% 
+#     mutate(method_value = ifelse(method_value=="y",1,0)) %>%
+#     spread(method_info,method_value) %>% column_to_rownames("teams") %>%
+#     pheatmap::pheatmap(annotation_row =annotate )
+
+
 
 # T-test:
 # H0: using a specific method is as good as other method
 # Halt: not using a specific method gives worse (higher) RMSE
-full_join(robust_score,method_res, by="teams") %>%
+left_join(robust_score,method_res, by="teams") %>%
     group_by(method_info) %>%
     #filter(teams!="Huiyuan") %>% # remove the team worse than random
     filter(!method_info %in% c("Prior knowledge network","Single cell data") ) %>%
@@ -68,7 +76,7 @@ full_join(robust_score,method_res, by="teams") %>%
 
 
 
-full_join(robust_score,method_res, by="teams") %>%
+left_join(robust_score,method_res, by="teams") %>%
     group_by(method_info,method_value) %>%
     mutate(method_value = ifelse(method_value=="y","used","not used")) %>%
     filter(!method_info %in% c("Prior knowledge network","Single cell data") ) %>%
@@ -82,7 +90,7 @@ full_join(robust_score,method_res, by="teams") %>%
     facet_wrap(~method_info) + theme_bw() + xlab('') + ylab('Score (mean RMSE)') + guides(fill=FALSE)
 ggsave("./publication/figures/figure2/sc1_methods_score_improvement.pdf")
 
-full_join(robust_score,method_res, by="teams") %>%
+left_join(robust_score,method_res, by="teams") %>%
     group_by(method_info,method_value) %>%
     mutate(method_value = ifelse(method_value=="y","used","not used")) %>%
     filter(!method_info %in% c("Prior knowledge network","Single cell data") ) %>%
@@ -91,7 +99,7 @@ full_join(robust_score,method_res, by="teams") %>%
 
 
 
-full_join(robust_score,method_res, by="teams") %>%
+left_join(robust_score,method_res, by="teams") %>%
     group_by(method_info,method_value) %>%
     mutate(method_value = ifelse(method_value=="y","used","not used")) %>%
     filter(!method_info %in% c("Prior knowledge network","Single cell data") ) %>%
@@ -148,8 +156,8 @@ ggplot(bar_data, aes(method,score_med,fill=method_info)) +
                                                   c("Neural network used","Neural network not used"),
                                                   c("Preprocessing used","Preprocessing not used"),
                                                   c("Tree based model used","Tree based model not used")),
-                               method = "t.test",method.args = list(alternative="less"),label.y = 2 ) +
-    ylim(0,3.2)
+                               method = "t.test",method.args = list(alternative="less"),label.y = 1.2 ) +
+    ylim(0,1.5)
 
 ggsave("./publication/figures/figure2/sc1_methods_score_improvement_pvalue.pdf", width = 6,height = 4)
 
@@ -157,7 +165,7 @@ ggsave("./publication/figures/figure2/sc1_methods_score_improvement_pvalue.pdf",
 
 
 ## Barplot showing the improvement of the RMSE: 
-bar_data <- full_join(robust_score,method_res, by="teams") %>%
+bar_data <- left_join(robust_score,method_res, by="teams") %>%
     #filter(teams!="Huiyuan") %>% # remove the team worse than random
     ungroup() %>%
     mutate(method_value = ifelse(method_value=="y","used","not used")) %>%
